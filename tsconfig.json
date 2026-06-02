@@ -1,34 +1,38 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
+    "target": "ES2021",
+    "module": "commonjs",
     "strict": true,
-    "noEmit": true,
+    "skipLibCheck": true,
     "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "react-jsx",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@ac/api-common": ["packages/api-common/src"],
+      "@ac/api-common/*": ["packages/api-common/src/*"],
+      "@ac/common": ["packages/api-common/src"],
+      "@ac/common/*": ["packages/api-common/src/*"],
+      "@ac/api-i18n": ["packages/api-i18n/src"],
+      "@ac/api-i18n/*": ["packages/api-i18n/src/*"],
+      "@ac/i18n": ["packages/api-i18n/src"],
+      "@ac/i18n/*": ["packages/api-i18n/src/*"],
+      "@ac/api-utils": ["packages/api-utils/src"],
+      "@ac/api-utils/*": ["packages/api-utils/src/*"],
+      "@ac/utils": ["packages/api-utils/src"],
+      "@ac/utils/*": ["packages/api-utils/src/*"],
+      "@ac/api-models": ["packages/api-models/src"],
+      "@ac/api-models/*": ["packages/api-models/src/*"],
+      "@ac/models": ["packages/api-models/src"],
+      "@ac/models/*": ["packages/api-models/src/*"],
+      "@ac/api-queue": ["packages/api-queue/src"],
+      "@ac/api-queue/*": ["packages/api-queue/src/*"],
+      "@workspace/shared": ["packages/shared/src"],
+      "@workspace/shared/*": ["packages/shared/src/*"],
+      "@workspace/ui": ["packages/ui/src"],
+      "@workspace/ui/*": ["packages/ui/src/*"],
+      "@workspace/permissions": ["packages/permissions/src"],
+      "@workspace/permissions/*": ["packages/permissions/src/*"]
     }
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    "**/*.mts"
-  ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "dist", "apps/*/dist", "packages/*/dist"]
 }

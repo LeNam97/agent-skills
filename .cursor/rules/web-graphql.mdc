@@ -1,0 +1,134 @@
+---
+description: Quy ước viết GraphQL queries/mutations và sử dụng Apollo Client trong apps/web/graphql/
+globs: apps/web/graphql/**
+alwaysApply: false
+---
+
+# apps/web/graphql/ — GraphQL Queries & Mutations
+
+Thư mục chứa các file `.graphql` (operations) và các file `.generated.ts` (TypeScript types được sinh tự động).
+
+## Cấu trúc
+
+```
+graphql/
+├── file.graphql                    # Operations cho File service
+├── file.generated.ts               # ← AUTO-GENERATED, không sửa tay
+├── authorization.graphql
+├── authorization.generated.ts
+├── chu-ky-so.graphql
+├── chu-ky-so.generated.ts
+├── anime.graphql                   # (demo/test)
+└── ...
+
+graphql-schema/                     # SDL schema từ backend (nguồn sự thật)
+├── notary.schema.graphql
+├── user-profile.schema.graphql
+├── master-data.schema.graphql
+└── authorization.schema.graphql
+```
+
+> **Không sửa file `.generated.ts` thủ công** — chạy `pnpm codegen` để tái tạo.
+
+## Mẫu file .graphql (operations)
+
+```graphql
+# graphql/giao-dich.graphql
+
+query GetGiaoDichList(
+  $skip: Int
+  $take: Int
+  $where: GiaoDichFilterInput
+  $order: [GiaoDichSortInput!]
+) {
+  giaoDichList(skip: $skip, take: $take, where: $where, order: $order) {
+    totalCount
+    items {
+      id
+      soHopDong
+      ngayKy
+      trangThai
+      donViId
+      __typename
+    }
+  }
+}
+
+query GetGiaoDichById($id: UUID!) {
+  giaoDich(id: $id) {
+    id
+    soHopDong
+    ngayKy
+    trangThai
+    __typename
+  }
+}
+
+mutation TaoGiaoDich($input: TaoGiaoDichInput!) {
+  taoGiaoDich(input: $input) {
+    id
+    soHopDong
+    __typename
+  }
+}
+```
+
+## Sinh TypeScript types (codegen)
+
+Sau khi thêm/sửa file `.graphql`:
+
+```sh
+cd apps/web
+pnpm codegen
+```
+
+Cấu hình tại `apps/web/codegen.ts` — tự động sinh `*.generated.ts` cạnh file `.graphql`.
+
+## Dùng với Apollo Client trong component
+
+```tsx
+// app/(admin)/giao-dich-cong-chung/page.tsx
+'use client'
+
+import { useSuspenseQuery } from '@apollo/client'
+import { GetGiaoDichListDocument } from '@/graphql/giao-dich.generated'
+
+export default function GiaoDichPage() {
+  const { data } = useSuspenseQuery(GetGiaoDichListDocument, {
+    variables: { skip: 0, take: 20 },
+  })
+
+  return <DataTable data={data.giaoDichList.items} />
+}
+```
+
+## Dùng mutation với Apollo Client
+
+```tsx
+'use client'
+
+import { useMutation } from '@apollo/client'
+import { TaoGiaoDichDocument } from '@/graphql/giao-dich.generated'
+
+export function TaoGiaoDichForm() {
+  const [taoGiaoDich, { loading }] = useMutation(TaoGiaoDichDocument, {
+    onCompleted: () => toast({ title: 'Tạo thành công' }),
+    onError: (err) => toast({ title: err.message, variant: 'destructive' }),
+    refetchQueries: [{ query: GetGiaoDichListDocument }],
+  })
+
+  const onSubmit = (values: FormValues) => {
+    taoGiaoDich({ variables: { input: values } })
+  }
+
+  return <form onSubmit={handleSubmit(onSubmit)}>...</form>
+}
+```
+
+## Quy tắc
+
+- **Tên operation** phải unique toàn dự án: `Get<Resource>`, `Create<Resource>`, `Update<Resource>`, `Delete<Resource>`
+- **Luôn có `__typename`** trong mỗi fragment để Apollo cache hoạt động đúng
+- **Không import từ `*.generated.ts`** ngoài `graphql/` folder — import bằng alias: `@/graphql/giao-dich.generated`
+- **Schema SDL** (`graphql-schema/`) chỉ copy từ backend, không sửa tay
+- **Mỗi service/domain** có 1 file `.graphql` riêng — không gộp chung tất cả

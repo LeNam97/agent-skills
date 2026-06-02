@@ -1,0 +1,74 @@
+---
+description: Cấu trúc tổng quan monorepo btp-csdlcc — quy ước tổ chức thư mục, packages, và apps
+alwaysApply: true
+---
+
+# Cấu trúc Monorepo CSDLCC
+
+**Stack:** pnpm workspaces + Turborepo | Node >= 20 | pnpm 9.15.9
+
+## Sơ đồ thư mục gốc
+
+```
+btp-csdlcc-monorepo/
+├── apps/                   # Ứng dụng có thể deploy
+│   ├── web/                # ✅ Frontend chính — Next.js 16
+│   ├── api-typeorm/        # ✅ Backend chính — NestJS + TypeORM
+│   ├── api-prisma/         # Backend — NestJS + Prisma
+│   ├── worker/             # Background jobs — NestJS
+│   ├── mobile/             # App di động — Expo / React Native
+│   ├── web-test/           # Design system sandbox
+│   └── api/                # NestJS skeleton (tham khảo)
+├── packages/               # Shared packages (workspace:*)
+│   ├── ui/                 # @workspace/ui — React component library
+│   ├── common/             # @ac/common — logic NestJS dùng chung
+│   ├── models-typeorm/     # @ac/models-typeorm — TypeORM entities
+│   ├── models-prisma/      # @ac/models-prisma — Prisma models
+│   ├── data-types/         # @ac/data-types — interface & types chung
+│   ├── i18n/               # @ac/i18n — đa ngôn ngữ
+│   ├── utils/              # @ac/utils — hàm tiện ích thuần
+│   ├── eslint-config/      # @workspace/eslint-config
+│   └── typescript-config/  # @workspace/typescript-config
+├── docker/                 # Dockerfile và BUILD_DOCKER.md
+├── turbo.json              # Turborepo pipeline
+├── pnpm-workspace.yaml     # Khai báo workspaces
+└── commitlint.config.js    # Conventional Commits rules
+```
+
+## Quy tắc quan trọng
+
+- **Không đặt code nghiệp vụ ở root** — root chỉ chứa config công cụ
+- **Shared logic → packages/**, không copy vào nhiều apps
+- **Mỗi package có tên npm rõ ràng** (`@workspace/*` hoặc `@ac/*`)
+- **Import workspace package bằng tên**, không dùng relative path xuyên app:
+
+```ts
+// ✅ Đúng
+import { Button } from '@workspace/ui'
+import { SomeUtil } from '@ac/utils'
+
+// ❌ Sai — không import xuyên app bằng relative path
+import { Button } from '../../../packages/ui/src/components/button'
+```
+
+## Turborepo tasks
+
+```sh
+pnpm build        # Build tất cả (theo thứ tự dependencies)
+pnpm dev          # Khởi chạy web app (dev mode)
+pnpm start:web    # Next.js dev server
+pnpm start:api    # NestJS dev server
+pnpm lint         # Lint toàn monorepo
+pnpm typecheck    # Type check toàn monorepo
+pnpm format       # Format toàn monorepo
+```
+
+## Nhánh Git và deploy
+
+| Nhánh | Mục đích |
+|-------|---------|
+| `develop` | Nhánh phát triển chính |
+| `build` | Trigger CI/CD deploy lên môi trường test |
+| `main` / `master` | Production |
+
+> Xem chi tiết từng app/package trong rule tương ứng.

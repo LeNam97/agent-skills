@@ -1,0 +1,111 @@
+---
+description: Quy ước viết custom React hooks trong apps/web/hooks/
+globs: apps/web/hooks/**
+alwaysApply: false
+---
+
+# apps/web/hooks/ — Custom React Hooks
+
+Thư mục chứa các **custom hooks** dùng chung toàn web app.  
+Hooks chỉ dùng trong một route → đặt trong `app/(admin)/<route>/hooks/` hoặc ngay trong component.
+
+## Hooks hiện có
+
+| File | Mô tả |
+|------|-------|
+| `use-page-title.ts` | Cập nhật `document.title` theo trang |
+| `use-confirm-leave.ts` | Cảnh báo khi rời trang có thay đổi chưa lưu |
+| `use-quy-trinh-ngan-chan-by-don-vi.ts` | Lấy quy trình ngăn chặn theo đơn vị |
+
+## Quy tắc đặt tên
+
+- **Prefix `use-`** — tất cả hooks đặt tên `use-<ten-chuc-nang>.ts`
+- **File name kebab-case:** `use-page-title.ts`, `use-confirm-leave.ts`
+- **Export named** function: `export function usePageTitle(...)`
+
+## Mẫu — hook đơn giản
+
+```ts
+// hooks/use-page-title.ts
+'use client'
+
+import { formatPageTitle } from '@/lib/site'
+import { useEffect } from 'react'
+
+export function usePageTitle(pageTitle?: string | React.ReactNode) {
+  useEffect(() => {
+    const titleText = typeof pageTitle === 'string' ? pageTitle.trim() : ''
+    document.title = formatPageTitle(titleText || undefined)
+  }, [pageTitle])
+}
+```
+
+## Mẫu — hook gọi API (TanStack Query)
+
+```ts
+// hooks/use-don-vi-list.ts
+import { useQuery } from '@tanstack/react-query'
+import { getDonViList } from '@/services/don-vi'
+
+export function useDonViList(params?: { skip?: number; take?: number }) {
+  return useQuery({
+    queryKey: ['don-vi-list', params],
+    queryFn: () => getDonViList(params),
+    staleTime: 5 * 60 * 1000,
+  })
+}
+```
+
+## Mẫu — hook mutation (TanStack Query)
+
+```ts
+// hooks/use-tao-giao-dich.ts
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { taoGiaoDich } from '@/services/giao-dich'
+import { toast } from '@workspace/ui/components/toast'
+
+export function useTaoGiaoDich() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: taoGiaoDich,
+    onSuccess: () => {
+      toast({ title: 'Tạo giao dịch thành công' })
+      queryClient.invalidateQueries({ queryKey: ['giao-dich-list'] })
+    },
+    onError: (error: Error) => {
+      toast({ title: error.message, variant: 'destructive' })
+    },
+  })
+}
+```
+
+## Mẫu — hook form với react-hook-form + zod
+
+```ts
+// hooks/use-form-tao-hop-dong.ts
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
+
+const schema = z.object({
+  tenHopDong: z.string().min(1, 'Vui lòng nhập tên hợp đồng'),
+  ngayKy: z.string().min(1, 'Vui lòng chọn ngày ký'),
+})
+
+export type FormTaoHopDong = z.infer<typeof schema>
+
+export function useFormTaoHopDong() {
+  return useForm<FormTaoHopDong>({
+    resolver: zodResolver(schema),
+    defaultValues: { tenHopDong: '', ngayKy: '' },
+  })
+}
+```
+
+## Quy tắc
+
+- Không thực hiện side effects ngoài `useEffect`
+- Không import store trực tiếp trong hook UI — truyền data qua props hoặc dùng hook riêng
+- Hooks gọi API luôn dùng **TanStack Query** (`useQuery` / `useMutation`)
+- Tránh đặt logic business vào hook — hook chỉ kết nối UI ↔ data layer

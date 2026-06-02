@@ -1,0 +1,123 @@
+---
+description: Quy ước viết Zustand global stores trong apps/web/stores/
+globs: apps/web/stores/**
+alwaysApply: false
+---
+
+# apps/web/stores/ — Zustand Global Stores
+
+Thư mục quản lý **global state** của ứng dụng dùng Zustand.  
+Chỉ đặt state **thực sự global** vào đây — state cục bộ của component dùng `useState`.
+
+## Stores hiện có
+
+| File | Export | Mô tả |
+|------|--------|-------|
+| `user.store.ts` | `useUserStore` | Thông tin user, permissions, token, appId |
+| `notification.store.ts` | `useNotificationStore` | Trạng thái notification realtime |
+| `index.ts` | re-exports | Barrel export toàn bộ stores |
+
+## Mẫu store chuẩn (Zustand + persist + devtools)
+
+```ts
+// stores/user.store.ts
+import { create } from 'zustand'
+import { devtools, persist } from 'zustand/middleware'
+
+interface UserState {
+  userId: string | null
+  permissions: string[]
+  permissionMap: Record<string, boolean>
+  isLoading: boolean
+  appId: number | null
+  organizationId: string | null
+
+  // Actions
+  setUser: (userId: string) => void
+  setPermissions: (permissions: string[]) => void
+  clearUser: () => void
+}
+
+export const useUserStore = create<UserState>()(
+  devtools(
+    persist(
+      (set) => ({
+        userId: null,
+        permissions: [],
+        permissionMap: {},
+        isLoading: false,
+        appId: null,
+        organizationId: null,
+
+        setUser: (userId) => set({ userId }),
+        setPermissions: (permissions) =>
+          set({
+            permissions,
+            permissionMap: Object.fromEntries(permissions.map((p) => [p, true])),
+          }),
+        clearUser: () =>
+          set({ userId: null, permissions: [], permissionMap: {}, appId: null }),
+      }),
+      { name: 'user-store' }  // key trong localStorage
+    ),
+    { name: 'UserStore' }     // tên hiển thị trong Redux DevTools
+  )
+)
+```
+
+## Mẫu store đơn giản (không persist)
+
+```ts
+// stores/notification.store.ts
+import { create } from 'zustand'
+
+interface NotificationState {
+  unreadCount: number
+  isOpen: boolean
+  setUnreadCount: (count: number) => void
+  toggleOpen: () => void
+}
+
+export const useNotificationStore = create<NotificationState>()((set) => ({
+  unreadCount: 0,
+  isOpen: false,
+  setUnreadCount: (count) => set({ unreadCount: count }),
+  toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
+}))
+```
+
+## Cách dùng trong component
+
+```tsx
+'use client'
+
+import { useUserStore } from '@/stores'
+
+export function UserAvatar() {
+  // ✅ Subscribe chỉ field cần thiết (tránh re-render không cần)
+  const userId = useUserStore((s) => s.userId)
+  const permissions = useUserStore((s) => s.permissions)
+
+  // ✅ Lấy action
+  const clearUser = useUserStore((s) => s.clearUser)
+
+  return <div>{userId}</div>
+}
+```
+
+## Barrel export (index.ts)
+
+```ts
+// stores/index.ts
+export { useUserStore } from './user.store'
+export { useNotificationStore } from './notification.store'
+```
+
+## Quy tắc
+
+- **Tên file:** `<ten-store>.store.ts`
+- **Tên hook:** `use<TenStore>Store` — ví dụ `useUserStore`
+- **`devtools`** luôn bọc ngoài để debug được bằng Redux DevTools
+- **`persist`** chỉ dùng khi cần lưu state qua reload (user session, preferences)
+- **Không** lưu data API response vào store — dùng TanStack Query cache
+- **Actions** (setX, clearX) đặt cùng interface với state

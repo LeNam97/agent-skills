@@ -1,0 +1,18 @@
+export const PM01_QUAN_LY_BOOKING = {
+  MODULE: "PM01_QUAN_LY_BOOKING",
+  VIEW_BOOKING: "VIEW_BOOKING",
+  BOOKING_CREATE: "BOOKING_CREATE",
+  UPDATE_BOOKING: "UPDATE_BOOKING",
+  DELETE_BOOKING: "DELETE_BOOKING",
+  BOOKING_APPROVAL: "BOOKING_APPROVAL",
+  SHIP_OWNER_BOOKING: "SHIP_OWNER_BOOKING",
+} as const;
+
+export const PM02_QUAN_LY_VE = "PM02_QUAN_LY_VE" as const;
+
+export type BookingPermission =
+  (typeof PM01_QUAN_LY_BOOKING)[keyof typeof PM01_QUAN_LY_BOOKING];
+
+export type PermissionKey =
+  | BookingPermission
+  | typeof PM02_QUAN_LY_VE;

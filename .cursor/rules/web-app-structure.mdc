@@ -1,0 +1,80 @@
+---
+description: Cấu trúc thư mục apps/web — Next.js 16 frontend chính của CSDLCC
+globs: apps/web/**
+alwaysApply: false
+---
+
+# apps/web — Frontend chính (Next.js 16)
+
+**Stack:** Next.js 16, React 19, TypeScript, Tailwind CSS v4, Apollo Client, TanStack Query, Zustand, next-auth v5, next-intl, Keycloak
+
+## Cấu trúc thư mục
+
+```
+apps/web/
+├── app/                  # Next.js App Router — routes & layouts
+│   ├── (admin)/          # Route group: yêu cầu đăng nhập (Keycloak)
+│   ├── (guest)/          # Route group: màn hình public
+│   ├── auth.ts           # NextAuth config
+│   ├── keycloak.ts       # Keycloak integration
+│   ├── layout.tsx        # Root layout
+│   └── page.tsx          # Root redirect page
+├── components/           # Components dùng chung toàn app (không thuộc route)
+├── constants/            # Hằng số, enums, permission keys
+├── graphql/              # GraphQL queries/mutations + generated types
+├── graphql-schema/       # SDL schema files (.graphql) từ backend
+├── hooks/                # Custom React hooks (use-*.ts)
+├── lib/                  # Helpers thuần — không có side effects React
+├── services/             # Hàm gọi API REST (fetch wrappers)
+├── stores/               # Zustand global state stores
+├── types/                # TypeScript types & interfaces riêng của web
+├── e2e/                  # Playwright BDD end-to-end tests
+├── public/               # Static assets
+├── env.ts                # Khai báo & validate biến môi trường
+├── codegen.ts            # GraphQL code generation config
+├── next.config.mjs       # Next.js config (standalone output)
+├── tailwind.config.cjs   # Tailwind CSS config
+└── playwright.config.ts  # Playwright E2E config
+```
+
+## Nguyên tắc đặt file
+
+| Loại | Thư mục | Ví dụ |
+|------|---------|-------|
+| UI page | `app/(admin)/<route>/page.tsx` | `app/(admin)/tra-cuu/page.tsx` |
+| Component dùng riêng cho route | `app/(admin)/<route>/components/` | `app/(admin)/tra-cuu/components/ket-qua-table.tsx` |
+| Component dùng toàn app | `components/` | `components/confirm-action-dialog.tsx` |
+| Custom hook | `hooks/use-*.ts` | `hooks/use-page-title.ts` |
+| Store | `stores/*.store.ts` | `stores/user.store.ts` |
+| GraphQL query | `graphql/*.graphql` | `graphql/file.graphql` |
+| REST service | `services/` | `services/api-request.ts` |
+| Hằng số | `constants/` | `constants/permissions.ts` |
+
+## Biến môi trường (env.ts)
+
+Tất cả biến `NEXT_PUBLIC_*` phải được khai báo trong `apps/web/env.ts`:
+
+```ts
+// apps/web/env.ts
+export const env: { [key: string]: string } = {
+  NEXT_PUBLIC_GRAPHQL_URL: process.env.NEXT_PUBLIC_GRAPHQL_URL,
+  NEXT_PUBLIC_API_NOTARY_URL: process.env.NEXT_PUBLIC_API_NOTARY_URL,
+  NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID,
+  NEXT_PUBLIC_KEYCLOAK_REALM: process.env.NEXT_PUBLIC_KEYCLOAK_REALM,
+  NEXT_PUBLIC_KEYCLOAK_ISSUER: process.env.NEXT_PUBLIC_KEYCLOAK_ISSUER,
+  // ... các biến khác
+} as { [key: string]: string }
+```
+
+> **Không truy cập `process.env.X` trực tiếp trong component** — luôn dùng qua `env.NEXT_PUBLIC_X`.
+
+## Next.js Config
+
+```js
+// next.config.mjs
+const nextConfig = {
+  output: 'standalone',           // Docker-optimized build
+  transpilePackages: ['@workspace/ui'],
+  reactStrictMode: false,
+}
+```

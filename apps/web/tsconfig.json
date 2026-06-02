@@ -1,0 +1,33 @@
+{
+  "extends": "@workspace/typescript-config/nextjs.json",
+  "compilerOptions": {
+    "baseUrl": "../..",
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["apps/web/*"],
+      "@workspace/ui": ["packages/ui/src"],
+      "@workspace/ui/*": ["packages/ui/src/*"],
+      "@workspace/shared": ["packages/shared/src"],
+      "@workspace/shared/*": ["packages/shared/src/*"],
+      "@workspace/permissions": ["packages/permissions/src"],
+      "@workspace/permissions/*": ["packages/permissions/src/*"],
+      "@ac/api-models": ["packages/api-models/src"],
+      "@ac/api-models/*": ["packages/api-models/src/*"],
+      "@ac/models": ["packages/api-models/src"],
+      "@ac/models/*": ["packages/api-models/src/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "exclude": ["node_modules"]
+}

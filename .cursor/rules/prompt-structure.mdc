@@ -1,0 +1,127 @@
+---
+description: Cấu trúc viết prompt từ tài liệu BA — hướng dẫn AI phân tích yêu cầu và sinh prompt chuẩn
+globs: prompts/**/*.md
+alwaysApply: false
+---
+
+# Cấu trúc Prompt từ tài liệu BA
+
+Khi nhận tài liệu yêu cầu từ BA, AI phân tích và sinh prompt theo cấu trúc dưới đây.
+
+## Quy trình phân tích
+
+1. **Đọc tài liệu** — xác định danh sách chức năng, actor, dữ liệu đầu vào/ra
+2. **Phân loại scope** — read-only (chỉ xem) hay full CRUD?
+3. **Xác định layers** — chức năng cần backend, frontend, hay cả hai?
+4. **Chia task** — mỗi chức năng độc lập = 1 task trong phần "Phân rã task"
+5. **Map fields** — từ tài liệu BA sang entity/DTO/cột UI cụ thể
+
+## Cấu trúc bắt buộc của prompt
+
+```markdown
+# Prompt: [Tên chức năng]
+
+> **Role:** BA → Dev
+> **Route API:** `apps/api/src/[module]/`        ← bỏ nếu không có backend
+> **Route Web:** `apps/web/app/(admin)/[route]/`  ← bỏ nếu không có frontend
+> **Data source:** [PostgreSQL qua TypeORM | GraphQL | ...]
+> **Entity:** `packages/api-models/src/entity/[name].entity.ts`
+> **DTO:** `packages/shared/src/dto/[module]/[name].dto.ts`
+
+---
+
+## Mục tiêu
+<!-- 2-3 câu: module này làm gì, ai dùng, giá trị chính -->
+
+---
+
+## Phân quyền
+<!-- Permission group + bảng Action → Constant -->
+
+---
+
+## Phân rã task
+<!-- ĐÂY LÀ PHẦN QUAN TRỌNG NHẤT — chia nhỏ tài liệu BA thành các task -->
+<!-- Mỗi task là 1 đơn vị có thể code & test độc lập -->
+
+---
+
+## Màn hình chính — [Tên màn hình]
+<!-- Bảng: Cột UI | Field API | Ghi chú -->
+<!-- Bộ lọc & tìm kiếm -->
+<!-- Thống kê nếu có -->
+
+---
+
+## Chi tiết / Form [tên]
+<!-- Bảng: Trường | Field — chia theo nhóm thông tin -->
+
+---
+
+## API Backend
+<!-- Bảng: Method | Route | Mô tả | Permission -->
+<!-- Filter, response contract -->
+
+---
+
+## Model & Enum
+<!-- Entity fields, enum values, DTO ↔ Entity mapping -->
+
+---
+
+## Cấu trúc file
+<!-- Tree view các file cần tạo/sửa -->
+
+---
+
+## Lưu ý kỹ thuật
+<!-- Bullet points ngắn gọn -->
+
+---
+
+## Tiêu chí hoàn thành
+<!-- Checklist [ ] cho backend + frontend -->
+```
+
+## Phần "Phân rã task" — cách viết
+
+Đây là phần AI cần phân tích kỹ nhất. Mỗi task phải có:
+
+| Thành phần     | Mô tả                                        |
+| -------------- | -------------------------------------------- |
+| Tên task       | Hành động cụ thể (VD: "Tạo API phân trang") |
+| Layer          | Backend / Frontend / Full-stack              |
+| Phụ thuộc      | Task nào cần hoàn thành trước                |
+| File liên quan | Danh sách file cần tạo/sửa                  |
+| Tiêu chí done  | Điều kiện để task được coi là hoàn thành     |
+
+Ví dụ:
+
+```markdown
+## Phân rã task
+
+| #  | Task                          | Layer     | Phụ thuộc | File chính                        |
+| -- | ----------------------------- | --------- | --------- | --------------------------------- |
+| T1 | Tạo Entity + Enum             | Backend   | —         | `entity/bookings.entity.ts`       |
+| T2 | Tạo DTO (Create/Update/Search)| Backend   | T1        | `dto/bookings/bookings-core.dto.ts` |
+| T3 | Tạo Repository + filter       | Backend   | T1        | `data-access/bookings.repository.ts` |
+| T4 | Tạo API phân trang + chi tiết | Backend   | T2, T3    | `bookings.controller.ts`, `bookings.service.ts` |
+| T5 | Tạo API tạo/sửa/xoá          | Backend   | T2, T3    | `bookings.controller.ts`, `bookings.service.ts` |
+| T6 | Tạo trang danh sách           | Frontend  | T4        | `booking-list.tsx`                |
+| T7 | Tạo dialog chi tiết           | Frontend  | T4        | `booking-detail-dialog.tsx`       |
+| T8 | Tạo form tạo/sửa              | Frontend  | T5        | `booking-form-dialog.tsx`         |
+
+### T1 — Tạo Entity + Enum
+- **Mô tả:** Định nghĩa entity và các enum cần thiết
+- **File:** `packages/api-models/src/entity/bookings.entity.ts`
+- **Done khi:** Entity compile thành công, enum cover đủ giá trị từ tài liệu
+```
+
+## Quy tắc chung
+
+- **Bảng > prose** — dùng table cho field mapping, cột UI, endpoints, task list
+- **Gom theo nhóm** — entity fields chia nhóm (định danh, lịch trình, tài chính, audit)
+- **UI trước, API sau** — người đọc hình dung UI rồi mới xem API phục vụ UI đó
+- **Section nào không áp dụng thì bỏ** — read-only không cần "Form tạo/sửa"
+- **Mỗi section cách nhau bằng `---`** — dễ scan
+- **Metadata trong blockquote** — không dùng YAML frontmatter cho prompt

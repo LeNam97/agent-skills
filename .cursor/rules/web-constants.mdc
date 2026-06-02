@@ -1,0 +1,121 @@
+---
+description: Quy ước định nghĩa constants, enums, permissions trong apps/web/constants/
+globs: apps/web/constants/**
+alwaysApply: false
+---
+
+# apps/web/constants/ — Constants & Enums
+
+Thư mục chứa các hằng số, enum, permission keys dùng chung toàn web app.
+
+## Cấu trúc thư mục
+
+```
+constants/
+├── permissions.ts                          # Tất cả permission keys của hệ thống
+├── permissions-group.constants.ts          # Nhóm permissions theo module
+├── roles.constants.ts                      # Hằng số liên quan vai trò (roles)
+├── quyen.constants.ts                      # Quyền theo nghiệp vụ cụ thể
+├── status-map.ts                           # Map trạng thái → label/color
+├── bao-cao-hoat-dong-cong-chung.enums.ts   # Enums cho báo cáo
+├── chu-ky-so.enums.ts                      # Enums cho chữ ký số
+├── yeu-cau-chuyen-so-huu-giao-dich.enums.ts
+├── yeu-cau-tra-cuu-van-ban-cong-chung.enums.ts
+└── group-users.constants.ts
+```
+
+## Mẫu — permissions.ts
+
+```ts
+// constants/permissions.ts
+export const PERMISSIONS = {
+  SUPER_ADMIN: 'SUPER_ADMIN',
+
+  // Chữ ký số
+  CHU_KY_SO_ADD: 'ChuKySo.Add',
+  CHU_KY_SO_APPROVE: 'ChuKySo.Approve',
+  CHU_KY_SO_DELETE: 'ChuKySo.Delete',
+  CHU_KY_SO_EDIT: 'ChuKySo.Edit',
+
+  // Công chứng viên
+  CONG_CHUNG_VIEN_ADD: 'CongChungVien.Add',
+  CONG_CHUNG_VIEN_DELETE: 'CongChungVien.Delete',
+  CONG_CHUNG_VIEN_EDIT: 'CongChungVien.Edit',
+  CONG_CHUNG_VIEN_VIEW_DETAIL: 'CongChungVien.ViewDetail',
+
+  // Giao dịch công chứng
+  GIAO_DICH_ADD: 'GiaoDich.Add',
+  GIAO_DICH_APPROVE: 'GiaoDich.Approve',
+  GIAO_DICH_DELETE: 'GiaoDich.Delete',
+  GIAO_DICH_EDIT: 'GiaoDich.Edit',
+  GIAO_DICH_VIEW_DETAIL: 'GiaoDich.ViewDetail',
+} as const
+
+export type PermissionKey = keyof typeof PERMISSIONS
+export type PermissionValue = (typeof PERMISSIONS)[PermissionKey]
+```
+
+## Mẫu — enums
+
+```ts
+// constants/bao-cao-hoat-dong-cong-chung.enums.ts
+export enum TrangThaiBaoCao {
+  NHAP = 'NHAP',
+  CHO_DUYET = 'CHO_DUYET',
+  DA_DUYET = 'DA_DUYET',
+  TU_CHOI = 'TU_CHOI',
+}
+
+export const TRANG_THAI_BAO_CAO_LABEL: Record<TrangThaiBaoCao, string> = {
+  [TrangThaiBaoCao.NHAP]: 'Nháp',
+  [TrangThaiBaoCao.CHO_DUYET]: 'Chờ duyệt',
+  [TrangThaiBaoCao.DA_DUYET]: 'Đã duyệt',
+  [TrangThaiBaoCao.TU_CHOI]: 'Từ chối',
+}
+```
+
+## Mẫu — status-map.ts
+
+```ts
+// constants/status-map.ts
+export type StatusVariant = 'default' | 'success' | 'warning' | 'destructive'
+
+export const TRANG_THAI_GIAO_DICH_MAP: Record<string, { label: string; variant: StatusVariant }> = {
+  NHAP: { label: 'Nháp', variant: 'default' },
+  CHO_XU_LY: { label: 'Chờ xử lý', variant: 'warning' },
+  HOAN_THANH: { label: 'Hoàn thành', variant: 'success' },
+  HUY: { label: 'Đã hủy', variant: 'destructive' },
+}
+```
+
+## Kiểm tra quyền trong component
+
+```tsx
+'use client'
+
+import { PERMISSIONS } from '@/constants/permissions'
+import { useUserStore } from '@/stores'
+
+export function ActionButtons() {
+  const permissionMap = useUserStore((s) => s.permissionMap)
+
+  const canEdit = permissionMap[PERMISSIONS.GIAO_DICH_EDIT]
+  const canDelete = permissionMap[PERMISSIONS.GIAO_DICH_DELETE]
+
+  return (
+    <div>
+      {canEdit && <Button>Chỉnh sửa</Button>}
+      {canDelete && <Button variant="destructive">Xóa</Button>}
+    </div>
+  )
+}
+```
+
+## Quy tắc
+
+- **Tên file:** `<ten-module>.<loai>.ts` — ví dụ `chu-ky-so.enums.ts`, `roles.constants.ts`
+- **PERMISSIONS object:** dùng `as const` để TypeScript infer literal types
+- **Tên key:** `SCREAMING_SNAKE_CASE` theo format `<MODULE>_<HANH_DONG>`
+- **Không hardcode string permissions** trong component — luôn import từ `PERMISSIONS`
+- **Enums** dùng khi giá trị có ý nghĩa nghiệp vụ rõ ràng và fixed
+- **Label maps** (hiển thị UI) đặt cùng file với enum tương ứng

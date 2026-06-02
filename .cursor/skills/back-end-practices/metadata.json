@@ -1,0 +1,14 @@
+{
+  "version": "1.0.0",
+  "organization": "AC E-Ticket Team",
+  "date": "May 2026",
+  "abstract": "Monorepo conventions for Vietnamese e-ticket platform: NestJS feature modules with NextAuth middleware, TypeORM custom repositories with QueryBuilder, shared class-validator DTOs, permission catalogs, and TanStack admin tables. Derived from demo/ folder.",
+  "references": [
+    "demo/bookings/",
+    "demo/packages/api-models/",
+    "demo/packages/shared/",
+    "demo/packages/ui/",
+    "https://docs.nestjs.com",
+    "https://typeorm.io"
+  ]
+}

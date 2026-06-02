@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "webpack": true,
+    "webpackConfigPath": "webpack.config.js"
+  },
+  "monorepo": true,
+  "root": ".",
+  "defaultLibraryPrefix": "@ac",
+  "projects": {
+    "api": {
+      "type": "application",
+      "root": ".",
+      "entryFile": "main",
+      "sourceRoot": "src",
+      "compilerOptions": {
+        "tsConfigPath": "tsconfig.json"
+      }
+    },
+    "common": {
+      "type": "library",
+      "root": "../../packages/api-common",
+      "entryFile": "index",
+      "sourceRoot": "../../packages/api-common/src",
+      "compilerOptions": {
+        "tsConfigPath": "../../packages/api-common/tsconfig.lib.json"
+      }
+    },
+    "i18n": {
+      "type": "library",
+      "root": "../../packages/api-i18n",
+      "entryFile": "index",
+      "sourceRoot": "../../packages/api-i18n/src",
+      "compilerOptions": {
+        "tsConfigPath": "../../packages/api-i18n/tsconfig.lib.json"
+      }
+    },
+    "utils": {
+      "type": "library",
+      "root": "../../packages/api-utils",
+      "entryFile": "index",
+      "sourceRoot": "../../packages/api-utils/src",
+      "compilerOptions": {
+        "tsConfigPath": "../../packages/api-utils/tsconfig.lib.json"
+      }
+    },
+    "models": {
+      "type": "library",
+      "root": "../../packages/api-models",
+      "entryFile": "index",
+      "sourceRoot": "../../packages/api-models/src",
+      "compilerOptions": {
+        "tsConfigPath": "../../packages/api-models/tsconfig.lib.json"
+      }
+    },
+    "api-queue": {
+      "type": "library",
+      "root": "../../packages/api-queue",
+      "entryFile": "index",
+      "sourceRoot": "../../packages/api-queue/src",
+      "compilerOptions": {
+        "tsConfigPath": "../../packages/api-queue/tsconfig.build.json"
+      }
+    }
+  }
+}

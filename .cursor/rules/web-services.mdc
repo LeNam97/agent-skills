@@ -1,0 +1,133 @@
+---
+description: Quy ước viết REST API services trong apps/web/services/
+globs: apps/web/services/**
+alwaysApply: false
+---
+
+# apps/web/services/ — REST API Services
+
+Thư mục chứa các hàm gọi **REST API** đến backend.  
+GraphQL dùng Apollo Client trực tiếp trong `graphql/` — không đặt vào đây.
+
+## Cấu trúc thư mục services
+
+```
+services/
+├── api-request.ts          # Wrapper fetch chung (ApiRequest helper)
+├── api/                    # REST calls theo domain
+│   ├── don-vi.ts
+│   ├── giao-dich.ts
+│   └── ...
+├── danh-muc/               # REST calls cho danh mục
+├── authorization-rest.ts   # Auth/phân quyền REST calls
+├── file-object-rest.ts     # Upload/download file
+├── chu-ky-so-rest.ts       # Chữ ký số REST calls
+└── account-context.ts      # Account context helpers
+```
+
+## Sử dụng `apiRequest` helper
+
+`api-request.ts` cung cấp `apiRequest<T>()` — wrapper chuẩn cho mọi REST call:
+
+```ts
+// services/api/don-vi.ts
+import { apiRequest } from '@/services/api-request'
+import { env } from '@/env'
+
+export type DonVi = {
+  id: string
+  ten: string
+  ma: string
+}
+
+// GET danh sách
+export async function getDonViList(params?: { skip?: number; take?: number }) {
+  return apiRequest<{ items: DonVi[]; totalCount: number }>({
+    url: `${env.NEXT_PUBLIC_API_NOTARY_URL}/don-vi`,
+    method: 'GET',
+    params,
+  })
+}
+
+// POST tạo mới
+export async function taoMoiDonVi(payload: { ten: string; ma: string }) {
+  return apiRequest<DonVi>({
+    url: `${env.NEXT_PUBLIC_API_NOTARY_URL}/don-vi`,
+    method: 'POST',
+    payload,
+    successMessage: 'Tạo đơn vị thành công',
+    showToast: true,
+  })
+}
+
+// PUT cập nhật
+export async function capNhatDonVi(id: string, payload: Partial<DonVi>) {
+  return apiRequest<DonVi>({
+    url: `${env.NEXT_PUBLIC_API_NOTARY_URL}/don-vi/${id}`,
+    method: 'PUT',
+    payload,
+    successMessage: 'Cập nhật thành công',
+    showToast: true,
+  })
+}
+
+// DELETE
+export async function xoaDonVi(id: string) {
+  return apiRequest<void>({
+    url: `${env.NEXT_PUBLIC_API_NOTARY_URL}/don-vi/${id}`,
+    method: 'DELETE',
+    successMessage: 'Xóa thành công',
+    showToast: true,
+  })
+}
+```
+
+## Tùy chọn ApiRequestOptions
+
+```ts
+type ApiRequestOptions<T> = {
+  url: string
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+  payload?: unknown                    // Body của request
+  params?: Record<string, ...>         // Query params (tự động append vào URL)
+  getHeaders?: () => Promise<Record<string, string>>
+  successMessage?: string              // Toast khi thành công
+  errorMessage?: string                // Toast fallback khi lỗi
+  showToast?: boolean                  // Hiện toast tự động
+  throwOnError?: boolean               // Throw lỗi lên caller (default: true)
+  repairData?: (data: unknown) => T    // Transform response data
+  onSuccess?: (data: T) => void
+  onError?: (error: Error) => void
+}
+```
+
+## Dùng cùng TanStack Query trong hook
+
+```ts
+// hooks/use-don-vi.ts
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { getDonViList, taoMoiDonVi } from '@/services/api/don-vi'
+
+export function useDonViList() {
+  return useQuery({
+    queryKey: ['don-vi'],
+    queryFn: () => getDonViList(),
+  })
+}
+
+export function useTaoMoiDonVi() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: taoMoiDonVi,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['don-vi'] }),
+  })
+}
+```
+
+## Quy tắc
+
+- **Tên file:** theo domain nghiệp vụ — `don-vi.ts`, `giao-dich.ts`, `tai-san.ts`
+- **Luôn dùng `env.NEXT_PUBLIC_*`** để lấy base URL, không hardcode
+- **Không gọi fetch() trực tiếp trong component** — phải qua service function
+- **Toast** do `apiRequest` xử lý khi `showToast: true` — không toast thêm ở nơi khác
+- **Kết hợp với TanStack Query** trong hook, không gọi service trực tiếp trong component

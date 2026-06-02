@@ -1,0 +1,106 @@
+---
+description: Quy ước Next.js App Router — route groups, layouts, pages trong apps/web/app/
+globs: apps/web/app/**
+alwaysApply: false
+---
+
+# apps/web/app/ — Next.js App Router
+
+## Cấu trúc route groups
+
+```
+app/
+├── (admin)/              # Yêu cầu xác thực Keycloak
+│   ├── layout.tsx        # Layout admin: sidebar, header, auth guard
+│   ├── dashboard/
+│   ├── giao-dich-cong-chung/
+│   │   ├── page.tsx      # Trang danh sách
+│   │   └── components/   # Components cục bộ của route này
+│   ├── tra-cuu/
+│   │   ├── page.tsx
+│   │   ├── components/
+│   │   │   └── ket-qua-table.tsx
+│   │   ├── cong-chung-vien/
+│   │   └── giao-dich-cong-chung/
+│   └── ...
+├── (guest)/              # Public — không cần đăng nhập
+├── auth.ts               # NextAuth config
+├── keycloak.ts           # Keycloak utils
+├── layout.tsx            # Root layout (providers)
+└── page.tsx              # Root redirect
+```
+
+## Quy ước đặt tên
+
+- **Route folder:** kebab-case tiếng Việt không dấu, ví dụ `giao-dich-cong-chung`
+- **Page file:** luôn là `page.tsx` — đây là điểm vào của route
+- **Layout file:** `layout.tsx` — dùng cho nested layout của route group
+- **Components cục bộ:** đặt trong `<route>/components/` nếu chỉ dùng cho route đó
+
+## Mẫu page.tsx chuẩn
+
+```tsx
+// apps/web/app/(admin)/giao-dich-cong-chung/page.tsx
+'use client'
+
+import { usePageTitle } from '@/hooks/use-page-title'
+import { AdminPageLayout } from '@/components/admin-page-layout'
+
+export default function GiaoDichCongChungPage() {
+  usePageTitle('Quản lý giao dịch công chứng')
+
+  return (
+    <AdminPageLayout title="Giao dịch công chứng">
+      {/* nội dung trang */}
+    </AdminPageLayout>
+  )
+}
+```
+
+## Mẫu layout admin (admin)/layout.tsx
+
+```tsx
+// app/(admin)/layout.tsx
+import { redirect } from 'next/navigation'
+import { auth } from '../auth'
+
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const session = await auth()
+  if (!session) redirect('/login')
+
+  return (
+    <div className="flex min-h-screen">
+      <AppSidebar />
+      <main className="flex-1">{children}</main>
+    </div>
+  )
+}
+```
+
+## Modules chức năng trong (admin)/
+
+| Route | Chức năng |
+|-------|-----------|
+| `dashboard` | Bảng điều khiển tổng quan |
+| `giao-dich-cong-chung` | Giao dịch công chứng |
+| `to-chuc-cong-chung` | Tổ chức công chứng |
+| `cong-chung-vien` | Công chứng viên |
+| `van-ban-cong-chung-dien-tu` | Văn bản điện tử |
+| `tra-cuu` | Tra cứu thông tin |
+| `thong-tin-ngan-chan` | Thông tin ngăn chặn |
+| `thong-tin-giai-toa` | Thông tin giải tỏa |
+| `quan-ly-tai-san` | Quản lý tài sản |
+| `danh-muc` | Danh mục hệ thống |
+| `quan-tri-he-thong` | Quản trị hệ thống |
+| `bao-cao-hoat-dong-cong-chung` | Báo cáo hoạt động |
+| `chu-ky-so` | Chữ ký số |
+| `hau-kiem-du-lieu` | Hậu kiểm dữ liệu |
+| `quan-ly-dong-bo` | Đồng bộ dữ liệu |
+| `yeu-cau-*` | Các yêu cầu nghiệp vụ |
+
+## Quy tắc
+
+- **`'use client'`** chỉ khai báo khi dùng hooks, event handlers, browser APIs
+- **Server Component** (không có `'use client'`) dùng để fetch data phía server
+- **Components cục bộ** của route đặt trong `<route>/components/`, không đặt vào `app/components/` toàn cục
+- **Alias `@/`** trỏ đến `apps/web/` — dùng thay cho relative path dài

@@ -1,0 +1,24 @@
+{
+  "name": "@ac/api-models",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types/index.ts"
+  },
+  "scripts": {
+    "build": "echo api-models is source-first - no build needed",
+    "dev": "echo api-models is source-first - no build needed",
+    "lint": "echo 'no lint configured'"
+  },
+  "devDependencies": {
+    "@nestjs/typeorm": "^11.0.1",
+    "pg": "^8.21.0",
+    "typeorm": "^1.0.0"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.24"
+  }
+}

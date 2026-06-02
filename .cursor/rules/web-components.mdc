@@ -1,0 +1,101 @@
+---
+description: Quy ước viết và tổ chức React components trong apps/web/components/
+globs: apps/web/components/**
+alwaysApply: false
+---
+
+# apps/web/components/ — Shared Components
+
+Thư mục này chứa các component dùng chung cho **toàn bộ** web app.  
+Component chỉ dùng trong một route → đặt trong `app/(admin)/<route>/components/`.
+
+## Các components hiện có
+
+| File | Mô tả |
+|------|-------|
+| `admin-page-layout.tsx` | Layout wrapper chuẩn cho mọi trang admin |
+| `admin-layout-content.tsx` | Content area trong admin layout |
+| `confirm-action-dialog.tsx` | Dialog xác nhận hành động (xóa, submit...) |
+| `audit-history-dialog.tsx` | Dialog lịch sử thay đổi |
+| `document-upload-dropzone-card.tsx` | Card upload file dạng drag-and-drop |
+| `file-preview-dialog.tsx` | Dialog xem trước file |
+| `app-sidebar.tsx` | Sidebar điều hướng chính |
+| `app-providers.tsx` | Root providers (QueryClient, Theme...) |
+| `expandable-text.tsx` | Text có thể mở rộng/thu gọn |
+
+## Mẫu component chuẩn
+
+```tsx
+// components/confirm-action-dialog.tsx
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@workspace/ui/components/alert-dialog'
+
+type ConfirmActionDialogProps = {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title?: React.ReactNode
+  description?: React.ReactNode
+  confirmText?: string
+  cancelText?: string
+  onConfirm: () => void
+  confirmVariant?: 'default' | 'destructive'
+}
+
+export function ConfirmActionDialog({
+  open,
+  onOpenChange,
+  title = 'Xác nhận',
+  description = 'Bạn có chắc chắn muốn thực hiện hành động này không?',
+  confirmText = 'Đồng ý',
+  cancelText = 'Hủy',
+  onConfirm,
+  confirmVariant = 'default',
+}: ConfirmActionDialogProps) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{cancelText}</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm}>{confirmText}</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+```
+
+## Mẫu AdminPageLayout
+
+```tsx
+// Cách dùng trong page.tsx
+import { AdminPageLayout } from '@/components/admin-page-layout'
+
+export default function MyPage() {
+  return (
+    <AdminPageLayout
+      title="Tiêu đề trang"
+      actions={<Button>Tạo mới</Button>}
+    >
+      <DataTable ... />
+    </AdminPageLayout>
+  )
+}
+```
+
+## Quy tắc
+
+- **Named export** — không dùng default export cho components (trừ `page.tsx`)
+- **Props type** đặt ngay trên component, đặt tên `<ComponentName>Props`
+- **Không** import trực tiếp từ `@workspace/ui/src/` — dùng path đã export: `@workspace/ui/components/button`
+- Component UI base (Button, Input, Table...) lấy từ `@workspace/ui`, không tự viết lại
+- **`'use client'`** chỉ thêm khi component dùng hooks hoặc browser events

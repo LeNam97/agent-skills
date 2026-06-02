@@ -1,0 +1,140 @@
+---
+description: Quy ước sử dụng và phát triển shared packages trong packages/ của monorepo
+globs: packages/**
+alwaysApply: false
+---
+
+# packages/ — Shared Packages
+
+Thư mục chứa các package dùng chung giữa nhiều apps.  
+**Quy tắc vàng:** Nếu logic dùng ở 2+ apps → đặt vào package tương ứng.
+
+## Danh sách packages
+
+| Package | Tên npm | Dùng cho |
+|---------|---------|---------|
+| `ui` | `@workspace/ui` | React components (frontend) |
+| `common` | `@ac/common` | Logic NestJS dùng chung (backend) |
+| `models-typeorm` | `@ac/models-typeorm` | TypeORM entities |
+| `models-prisma` | `@ac/models-prisma` | Prisma models |
+| `data-types` | `@ac/data-types` | Interfaces & types chung |
+| `i18n` | `@ac/i18n` | Bản dịch / đa ngôn ngữ |
+| `utils` | `@ac/utils` | Pure utility functions |
+| `eslint-config` | `@workspace/eslint-config` | ESLint config tập trung |
+| `typescript-config` | `@workspace/typescript-config` | tsconfig base |
+
+---
+
+## @workspace/ui — React Component Library
+
+**Cấu trúc:**
+```
+packages/ui/src/
+├── components/       # shadcn-ui components (Button, Input, Table, Dialog...)
+├── hooks/            # Hooks UI (useToast, useMediaQuery...)
+├── lib/              # Utilities UI (cn(), tableStateUtils...)
+├── mi/               # Custom components nội bộ (DataTable, Form...)
+├── constants/        # Constants UI (APP_IDS, BASE_URL...)
+└── types/            # Types UI
+```
+
+**Cách import:**
+```tsx
+// ✅ Đúng — import theo path export
+import { Button } from '@workspace/ui/components/button'
+import { DataTable } from '@workspace/ui/mi/table/data-table'
+import { toast } from '@workspace/ui/components/toast'
+import { cn } from '@workspace/ui/lib/utils'
+
+// ❌ Sai — không import từ src/ trực tiếp
+import { Button } from '@workspace/ui/src/components/button'
+```
+
+**Thêm component mới vào UI:**
+```sh
+cd packages/ui
+# Dùng shadcn CLI hoặc tạo thủ công trong src/components/
+```
+
+---
+
+## @ac/common — NestJS Shared Logic
+
+**Phụ thuộc:** `@ac/i18n`, `@ac/utils`, TypeORM, ioredis, lodash, class-validator, axios
+
+**Dùng cho:** decorators, guards, interceptors, pipes, base services, base DTOs.
+
+```ts
+// apps/api-typeorm/src/some.service.ts
+import { BaseService } from '@ac/common'
+import { SomeEntity } from '@ac/models-typeorm'
+```
+
+---
+
+## @ac/models-typeorm — TypeORM Entities
+
+```ts
+// Trong api-typeorm
+import { GiaoDichCongChungEntity } from '@ac/models-typeorm'
+
+// Định nghĩa entity trong package
+@Entity('giao_dich_cong_chung')
+export class GiaoDichCongChungEntity {
+  @PrimaryGeneratedColumn('uuid')
+  id: string
+
+  @Column()
+  soHopDong: string
+
+  @CreateDateColumn()
+  createdAt: Date
+}
+```
+
+---
+
+## @ac/utils — Pure Utility Functions
+
+Chứa các hàm thuần (không có framework dependency):
+
+```ts
+// packages/utils/src/index.ts
+export function formatDate(date: Date | string, format = 'dd/MM/yyyy'): string { ... }
+export function slugify(text: string): string { ... }
+export function chunk<T>(arr: T[], size: number): T[][] { ... }
+export function omit<T, K extends keyof T>(obj: T, keys: K[]): Omit<T, K> { ... }
+```
+
+---
+
+## @workspace/typescript-config — tsconfig bases
+
+```json5
+// packages/typescript-config/nextjs.json  — dùng cho Next.js apps
+// packages/typescript-config/nestjs.json  — dùng cho NestJS apps
+// packages/typescript-config/base.json    — base chung
+
+// Cách dùng trong app:
+// tsconfig.json
+{
+  "extends": "@workspace/typescript-config/nextjs.json"
+}
+```
+
+---
+
+## Quy tắc chung cho packages
+
+- **Chỉ export từ `src/index.ts`** (hoặc qua `exports` trong `package.json`)
+- **Build trước khi dùng** — Turborepo xử lý thứ tự tự động qua `dependsOn: ["^build"]`
+- **Không import app-specific logic** vào package — package phải độc lập
+- **Versioning:** tất cả dùng `workspace:*` trong monorepo, không dùng version cố định
+- **Không tạo package mới** nếu logic chỉ dùng trong 1 app — đặt thẳng vào app đó
+
+```yaml
+# pnpm-workspace.yaml
+packages:
+  - "apps/*"
+  - "packages/*"
+```
