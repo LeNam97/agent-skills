@@ -17,6 +17,38 @@ Chủ tàu chỉ xem booking của tàu mình (scope theo email đăng nhập).
 
 ---
 
+## Skill Sử dụng
+
+| Layer (cột trong Phân rã task) | Skill — rules tự load theo file |
+| ------------------------------ | ------------------------------- |
+| Backend | `.cursor/skills/back-end` |
+| Frontend | `.cursor/skills/font-end` |
+
+Agent đọc `SKILL.md` + `workflows/load-rules.md` của skill tương ứng **khi bắt đầu task** — chỉ load rule khớp file đang sửa, không khai báo rule trong spec.
+
+## Mode sử dụng
+
+- Sonnet 4.6
+
+---
+
+## Phân rã task
+
+| #  | Task | Layer | Phụ thuộc | File chính |
+| -- | ---- | ----- | --------- | ----------- |
+| T1 | Repository + filter phân trang | Backend | — | `data-access/bookings.repository.ts` |
+| T2 | DTO Create/Update/Search | Backend | — | `dto/bookings/bookings-core.dto.ts` |
+| T3 | API phân trang + thống kê + chi tiết | Backend | T1, T2 | `bookings.controller.ts`, `bookings.service.ts` |
+| T4 | API tạo / sửa / xoá | Backend | T2, T3 | `bookings.controller.ts`, `bookings.service.ts` |
+| T5 | API client web | Frontend | T3 | `booking.api.ts` |
+| T6 | Trang danh sách + filter + cards | Frontend | T3, T5 | `booking-list.tsx`, `fn.ts` |
+| T7 | Dialog chi tiết | Frontend | T3, T5 | `booking-detail-dialog.tsx` |
+| T8 | Form tạo / sửa (nếu có) | Frontend | T4, T5 | `booking-form-dialog.tsx` |
+
+**Thứ tự thực thi đề xuất:** T1 → T2 → T3 → T4 (backend) → T5 → T6 → T7 → T8 (frontend). T6 và T7 có thể song song sau T5.
+
+---
+
 ## Phân quyền
 
 - Permission group: `PM01_QUAN_LY_BOOKING`
@@ -54,11 +86,11 @@ Chủ tàu chỉ xem booking của tàu mình (scope theo email đăng nhập).
 
 ### Bộ lọc & tìm kiếm
 
-- **Keyword** — tìm theo `ma_dat_cho`, `nguoi_tao`
-- **Trạng thái** — dropdown multi-select từ `BookingTrangThai`
-- **Tàu thuyền** — dropdown từ danh sách tàu (`tau_thuyen_id`)
-- **Hành trình** — dropdown từ mã hành trình (`ht_ma_hanh_trinh`)
-- **Ngày đi** — date range filter (`tu_ngay` / `den_ngay`)
+- **Keyword** — tìm theo `ma_dat_cho`, `nguoi_tao` (text, advanced, debounce 300ms)
+- **Trạng thái** — multi-select từ `BookingTrangThai` (default bar)
+- **Tàu thuyền** — combobox (`tau_thuyen_id`, advanced)
+- **Hành trình** — combobox (`ht_ma_hanh_trinh`, advanced)
+- **Ngày đi** — date range (`tu_ngay` / `den_ngay`, advanced)
 
 ### Thống kê (summary cards)
 
@@ -354,26 +386,29 @@ mua_them_excel | link
 
 ```
 apps/api/src/bookings/
-├── bookings.controller.ts          # Thin controller — delegate sang service
-├── bookings.service.ts             # Business logic, enrich hành khách, scope chủ tàu
-└── bookings.module.ts              # DI, withNextAuthMiddleware
+├── bookings.controller.ts
+├── bookings.service.ts             # Scope chủ tàu theo email
+└── bookings.module.ts              # withNextAuthMiddleware
 
 packages/api-models/src/
-├── entity/bookings.entity.ts       # Schema — không đổi trừ khi cần
-├── data-access/bookings.repository.ts  # Query, pagination, filter
-└── types/booking.ts                # Enum BookingTrangThai, BookingNguonDatCho, …
+├── entity/bookings.entity.ts
+├── data-access/bookings.repository.ts
+└── types/booking.ts
 
 packages/shared/src/dto/bookings/
-├── bookings-core.dto.ts            # Create / Update / Search DTO
-└── index.ts                        # Re-export
+├── bookings-core.dto.ts
+└── index.ts
 
 apps/web/app/(admin)/quan-ly-booking/
-├── page.tsx                        # Re-export BookingListPage
-├── booking-list.tsx                # Bảng + filter + thống kê
-└── booking-detail-dialog.tsx       # Dialog chi tiết booking
+├── page.tsx
+├── booking-list.tsx
+├── booking.api.ts
+├── fn.ts
+├── booking-detail-dialog.tsx
+└── booking-form-dialog.tsx
 
 packages/permissions/src/
-└── permissions/pm1.permission.ts   # Tham chiếu key — không đổi
+└── permissions/pm1.permission.ts
 ```
 
 **Không sửa:** `node_modules/`, `.turbo/`, migration cũ, package không liên quan.
@@ -384,12 +419,11 @@ packages/permissions/src/
 
 ## Lưu ý kỹ thuật
 
-- Controller thin — mọi logic trong service/repository
+- Controller thin — logic trong service/repository
 - Module wrap `withNextAuthMiddleware(_BookingsModule, "bookings")`
 - Service scope `REQUEST` khi cần email user (endpoint chủ tàu)
 - Bảng dùng `DataTable` + `useEnhancedTable` từ `@workspace/ui`
-- Columns dùng `createColumnHelper<BookingItem>()`
-- Phân trang server-side: `skip` / `take` qua `BookingListQueryDto` + `applyListQueryFilters`
+- Phân trang server-side qua `BookingListQueryDto` + `applyListQueryFilters`
 - Selective joins — không over-fetch relations
 - Batch load hành khách — `IN` query, không loop N+1
 - Swagger `@ApiOperation` / `@ApiResponse` trên mọi endpoint

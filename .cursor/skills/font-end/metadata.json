@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "organization": "App City CMS Team",
+  "date": "June 2026",
+  "abstract": "Front-end conventions for App City CMS: Next.js 15 App Router list pages with useEnhancedTable, apiRequest API client without custom mutation hooks, React Hook Form + Zod forms, combobox/select filter rules, permission-based UI. Derived from .cursorrules.",
+  "references": [
+    "apps/web/",
+    "packages/ui/",
+    ".cursorrules",
+    ".cursor/rules/web-module-structure.mdc"
+  ]
+}

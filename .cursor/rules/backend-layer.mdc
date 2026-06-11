@@ -1,0 +1,29 @@
+---
+description: Backend layer — chỉ load apps/api/CLAUDE.md và back-end skill. Không load frontend context.
+globs: apps/api/**,packages/api-models/**,packages/shared/src/dto/**
+alwaysApply: false
+---
+
+# Backend Layer
+
+Task đang làm việc với **Backend**. Chỉ tuân theo context layer này.
+
+## CLAUDE.md (single source of truth)
+
+Đọc và tuân theo **`apps/api/CLAUDE.md`** — không đọc `apps/web/CLAUDE.md`.
+
+## Skill
+
+`.cursor/skills/back-end/SKILL.md` → `workflows/load-rules.md` → load rule theo file đang sửa.
+
+Module `packages/api-models/` → thêm `overrides/e-ticket.md`.
+
+## Phạm vi file
+
+- `apps/api/**`
+- `packages/api-models/**`
+- `packages/shared/src/dto/**`
+
+## Cấm trong task này
+
+- Sửa React pages, list components, UI styling trừ khi user yêu cầu rõ full-stack task tiếp theo

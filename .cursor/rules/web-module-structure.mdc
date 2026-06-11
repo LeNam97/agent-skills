@@ -1,0 +1,99 @@
+---
+description: Cấu trúc bắt buộc cho module Next.js Web — page, list, detail dialog, form dialog
+globs: apps/web/**/*.tsx,apps/web/**/*.ts,packages/ui/**/*.tsx
+alwaysApply: false
+---
+
+# Cấu trúc file Module Web (Next.js)
+
+Khi gen code cho bất kỳ module frontend nào, **bắt buộc** tổ chức file theo cấu trúc sau:
+
+## Cấu trúc thư mục
+
+```
+apps/web/app/(admin)/[route]/
+├── page.tsx                        # Next.js page — chỉ re-export [Name]ListPage, không có JSX
+├── [name]-list.tsx                 # Bảng chính: DataTable + filter + summary cards
+├── [name]-detail-dialog.tsx        # Dialog xem chi tiết (read-only)
+└── [name]-form-dialog.tsx          # Dialog tạo / sửa (nếu có CRUD)
+```
+
+## Quy tắc bắt buộc
+
+### `page.tsx` — chỉ re-export, không logic
+
+```tsx
+// ✅ Đúng
+export { [Name]ListPage as default } from './[name]-list';
+
+// ❌ Sai — đặt JSX trực tiếp trong page.tsx
+export default function Page() {
+  return <div>...</div>;
+}
+```
+
+### `[name]-list.tsx` — bảng danh sách
+
+Bắt buộc có đủ:
+- `DataTable` + `useEnhancedTable` từ `@workspace/ui`
+- `createColumnHelper<[Name]Item>()` cho column definitions
+- Bộ lọc: keyword, dropdown, date range
+- Summary cards phía trên bảng (gọi endpoint `/thong-ke`)
+- Kiểm tra permission trước khi render nút thao tác
+
+```tsx
+// ✅ Đúng — kiểm tra permission
+const { permissionMap } = useUserStore();
+{permissionMap[BOOKING_CREATE] && <Button onClick={openCreate}>Tạo mới</Button>}
+```
+
+### `[name]-detail-dialog.tsx` — dialog chi tiết
+
+- Dùng `Dialog` từ `@workspace/ui`
+- Chia thông tin thành các nhóm rõ ràng (section)
+- Không đặt form trong detail dialog
+
+### `[name]-form-dialog.tsx` — dialog tạo/sửa
+
+- Dùng `Dialog` + `Form` từ `@workspace/ui`
+- Tách `CreateForm` và `EditForm` nếu schema khác nhau
+- Reset form khi dialog đóng
+
+## Tên file — quy ước
+
+| File | Quy ước | Ghi chú |
+|------|---------|---------|
+| Page entry | `page.tsx` | Re-export only |
+| Danh sách | `[name]-list.tsx` | Bảng + filter + cards |
+| Chi tiết | `[name]-detail-dialog.tsx` | Read-only dialog |
+| Form | `[name]-form-dialog.tsx` | Create/Edit dialog |
+| Columns | `[name]-columns.tsx` | Tách ra nếu > 8 cột |
+| Hooks | `use-[name].ts` | Custom hook fetch data |
+
+## Phân trang server-side — bắt buộc
+
+```tsx
+// ✅ Đúng — server-side pagination
+const { data } = useQuery({
+  queryFn: () => fetch[Name]List({ page, pageSize, ...filters }),
+});
+
+// ❌ Sai — client-side filter trên toàn bộ data
+const filtered = allData.filter(item => item.name.includes(keyword));
+```
+
+## Badge trạng thái — nhóm màu
+
+Dùng hàm map từ enum → màu badge, không hardcode màu trong component:
+
+```tsx
+// ✅ Đúng
+const STATUS_COLOR: Record<[Name]TrangThai, string> = {
+  ban_nhap: 'gray',
+  da_duyet: 'green',
+  bi_tu_choi: 'red',
+};
+
+// ❌ Sai — hardcode màu trong JSX
+<Badge className={status === 'da_duyet' ? 'bg-green-500' : 'bg-gray-500'} />
+```

@@ -1,8 +1,11 @@
 import { Injectable } from "@nestjs/common";
+import {
+  applyListQueryFilters,
+  type ListQueryFilterConfig,
+} from "@ac/api-common";
 import { DataSource, Repository, SelectQueryBuilder, In } from "typeorm";
 import { Bookings } from "../entity/bookings.entity";
 import { BookingTrangThai } from "../types/booking";
-
 export interface BookingListQueryParams {
   page?: number;
   pageSize?: number;
@@ -28,6 +31,23 @@ export interface BookingThongKe {
   tong_tien: number;
 }
 
+const listFilterConfig: ListQueryFilterConfig = {
+  keyword: {
+    columns: ["booking.ma_dat_cho", "booking.nguoi_tao"],
+  },
+  columns: [
+    { paramKey: "trang_thai", dbColumn: "booking.trang_thai", compare: "in" },
+    { paramKey: "tau_thuyen_id", dbColumn: "booking.tau_thuyen_id", compare: "eq" },
+    { paramKey: "tu_ngay", dbColumn: "booking.ngay_di", compare: "gte" },
+    { paramKey: "den_ngay", dbColumn: "booking.ngay_di", compare: "lte" },
+    {
+      paramKey: "ht_ma_hanh_trinh",
+      dbColumn: "booking.ht_ma_hanh_trinh",
+      compare: "array-overlap",
+    },
+  ],
+};
+
 @Injectable()
 export class BookingsRepository extends Repository<Bookings> {
   constructor(private dataSource: DataSource) {
@@ -42,7 +62,7 @@ export class BookingsRepository extends Repository<Bookings> {
 
     const qb = this.createQueryBuilder("booking");
 
-    this.applyListQueryFilters(qb, params);
+    applyListQueryFilters(qb, params, listFilterConfig);
 
     qb.leftJoin("booking.tau_thuyen", "tau_thuyen")
       .addSelect(["tau_thuyen.id", "tau_thuyen.ten_tau", "tau_thuyen.ma_tau"]);
@@ -93,17 +113,7 @@ export class BookingsRepository extends Repository<Bookings> {
       .addSelect("COUNT(*)::int", "so_luong")
       .addSelect("COALESCE(SUM(booking.th_tong_tien), 0)", "tong_tien");
 
-    if (params.tu_ngay) {
-      qb.andWhere("booking.ngay_di >= :tu_ngay", { tu_ngay: params.tu_ngay });
-    }
-    if (params.den_ngay) {
-      qb.andWhere("booking.ngay_di <= :den_ngay", { den_ngay: params.den_ngay });
-    }
-    if (params.tau_thuyen_id) {
-      qb.andWhere("booking.tau_thuyen_id = :tau_thuyen_id", {
-        tau_thuyen_id: params.tau_thuyen_id,
-      });
-    }
+    applyListQueryFilters(qb, params, listFilterConfig);
 
     qb.groupBy("booking.trang_thai");
 
@@ -117,41 +127,4 @@ export class BookingsRepository extends Repository<Bookings> {
     return (result.affected ?? 0) > 0;
   }
 
-  private applyListQueryFilters(
-    qb: SelectQueryBuilder<Bookings>,
-    params: BookingListQueryParams
-  ): void {
-    if (params.trang_thai) {
-      qb.andWhere("booking.trang_thai = :trang_thai", {
-        trang_thai: params.trang_thai,
-      });
-    }
-
-    if (params.tau_thuyen_id) {
-      qb.andWhere("booking.tau_thuyen_id = :tau_thuyen_id", {
-        tau_thuyen_id: params.tau_thuyen_id,
-      });
-    }
-
-    if (params.tu_ngay) {
-      qb.andWhere("booking.ngay_di >= :tu_ngay", { tu_ngay: params.tu_ngay });
-    }
-
-    if (params.den_ngay) {
-      qb.andWhere("booking.ngay_di <= :den_ngay", { den_ngay: params.den_ngay });
-    }
-
-    if (params.ht_ma_hanh_trinh && params.ht_ma_hanh_trinh.length > 0) {
-      qb.andWhere("booking.ht_ma_hanh_trinh && :ht_ma_hanh_trinh", {
-        ht_ma_hanh_trinh: params.ht_ma_hanh_trinh,
-      });
-    }
-
-    if (params.keyword) {
-      qb.andWhere(
-        "(booking.ma_dat_cho ILIKE :keyword OR booking.nguoi_tao ILIKE :keyword)",
-        { keyword: `%${params.keyword}%` }
-      );
-    }
-  }
 }

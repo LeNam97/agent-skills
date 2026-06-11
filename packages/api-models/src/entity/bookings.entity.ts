@@ -4,12 +4,15 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from "typeorm";
 import {
   BookingTrangThai,
   BookingNguonDatCho,
   BookingNguonTinhGia,
 } from "../types/booking";
+import { TauThuyen } from "./tau-thuyen.entity";
 
 @Entity("bookings", { synchronize: false })
 export class Bookings {
@@ -24,6 +27,10 @@ export class Bookings {
 
   @Column({ name: "tau_thuyen_id", type: "uuid" })
   tau_thuyen_id!: string;
+
+  @ManyToOne(() => TauThuyen, { createForeignKeyConstraints: false })
+  @JoinColumn({ name: "tau_thuyen_id" })
+  tau_thuyen?: TauThuyen;
 
   @Column({ name: "tenant_code", type: "varchar" })
   tenant_code!: string;

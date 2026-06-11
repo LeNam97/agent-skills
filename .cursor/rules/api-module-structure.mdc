@@ -1,0 +1,78 @@
+---
+description: Cấu trúc bắt buộc cho module NestJS API — controller, service, module, entity, repository, DTO
+globs: apps/api/**/*.ts,packages/api-models/**/*.ts,packages/shared/src/dto/**/*.ts
+alwaysApply: false
+---
+
+# Cấu trúc file Module API (NestJS)
+
+Khi gen code cho bất kỳ module API nào, **bắt buộc** tổ chức file theo cấu trúc sau:
+
+## Cấu trúc thư mục
+
+```
+apps/api/src/[module]/
+├── [module].controller.ts      # Thin controller — chỉ nhận request, delegate sang service
+├── [module].service.ts         # Business logic, enrich data, scope theo actor
+└── [module].module.ts          # DI imports, withNextAuthMiddleware
+
+packages/api-models/src/
+├── entity/[name].entity.ts              # TypeORM entity — không sửa trừ khi cần migration
+├── data-access/[name].repository.ts     # Custom repository — query, pagination, filter
+└── types/[name].ts                      # Enum, interface, type dùng chung
+
+packages/shared/src/dto/[module]/
+├── [name]-core.dto.ts          # CreateDto / UpdateDto / SearchDto
+└── index.ts                    # Re-export tất cả DTO
+
+packages/permissions/src/
+└── permissions/pm[X].permission.ts      # Permission constants — không tạo file mới
+```
+
+## Quy tắc bắt buộc
+
+- **Controller thin**: không đặt logic trong controller, chỉ gọi `this.[module]Service.method()`
+- **DTO trong `packages/shared`**: không đặt DTO trong `apps/api`
+- **Entity trong `packages/api-models`**: không khai báo entity trong `apps/api`
+- **Repository dùng class riêng**: không inject `Repository<Entity>` trực tiếp vào service
+- **Module phải wrap middleware**:
+
+```ts
+// ✅ Đúng
+export const [Name]Module = withNextAuthMiddleware(_[Name]Module, "[module]");
+
+// ❌ Sai — export trực tiếp module không qua middleware
+export { _[Name]Module as [Name]Module };
+```
+
+- **Thứ tự route**: route cụ thể trước route param
+
+```ts
+// ✅ Đúng
+@Get('phan-trang')   // trước
+@Get('thong-ke')     // trước
+@Get(':id')          // sau cùng
+
+// ❌ Sai — :id đặt trước sẽ nuốt các route cụ thể
+@Get(':id')
+@Get('phan-trang')
+```
+
+- **Service scope REQUEST** khi cần email user (chủ tàu, scope theo actor):
+
+```ts
+@Injectable({ scope: Scope.REQUEST })
+export class [Name]Service { ... }
+```
+
+## Tên file — quy ước
+
+| File | Quy ước |
+|------|---------|
+| Controller | `[module].controller.ts` |
+| Service | `[module].service.ts` |
+| Module | `[module].module.ts` |
+| Entity | `[name].entity.ts` |
+| Repository | `[name].repository.ts` |
+| DTO | `[name]-core.dto.ts` |
+| Types/Enum | `[name].ts` trong `types/` |

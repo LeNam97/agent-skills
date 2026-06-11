@@ -1,0 +1,26 @@
+---
+description: Frontend layer — chỉ load apps/web/CLAUDE.md và font-end skill. Không load backend context.
+globs: apps/web/**,packages/ui/**
+alwaysApply: false
+---
+
+# Frontend Layer
+
+Task đang làm việc với **Frontend**. Chỉ tuân theo context layer này.
+
+## CLAUDE.md (single source of truth)
+
+Đọc và tuân theo **`apps/web/CLAUDE.md`** — không đọc `apps/api/CLAUDE.md`.
+
+## Skill
+
+`.cursor/skills/font-end/SKILL.md` → `workflows/load-rules.md` → load rule theo file đang sửa.
+
+## Phạm vi file
+
+- `apps/web/**`
+- `packages/ui/**`
+
+## Cấm trong task này
+
+- Sửa NestJS API, entity, repository, DTO backend trừ khi user yêu cầu rõ full-stack task tiếp theo

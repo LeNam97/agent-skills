@@ -1,0 +1,257 @@
+---
+description: Use this rule when asked to do list query filter, applyListQueryFilters, applyListFiltersChunked, GetListQueryBaseDto in backend repository
+globs:
+alwaysApply: false
+---
+
+# Backend List Filter — Repository
+
+Hướng dẫn cấu hình và áp dụng filter danh sách trong `packages/models/src/data-access/*.repository.ts`.
+
+---
+
+## 1. Import
+
+```typescript
+import {
+  applyListQueryFilters,      // filter thường (ít giá trị IN)
+  applyListFiltersChunked,    // filter + IN theo chunk (Oracle max ~1000)
+  GetListQueryBaseDto,        // list có phân trang
+  GetListQueryBaseAllDto,     // list không phân trang
+  GetListQueryHelperOptions,
+} from '@ac/common'
+```
+
+Controller nhận query:
+
+```typescript
+import { Get, GetListQueryBaseDto, Query, Route } from '@ac/common'
+import { Queries } from 'tsoa'
+
+@Get()
+findAllAndCount(@Queries() @Query() query: GetListQueryBaseDto) {
+  return this.service.findAllAndCount(query)
+}
+```
+
+Service chỉ forward sang repository:
+
+```typescript
+findAllAndCount(query: GetListQueryBaseDto) {
+  return this.repository.findAllAndCount(query)
+}
+```
+
+---
+
+## 2. Cấu trúc query từ client
+
+`GetListQueryBaseDto` gồm:
+
+| Field       | Mô tả                                      |
+| ----------- | ------------------------------------------ |
+| `page`      | Trang hiện tại (mặc định 1)                |
+| `pageSize`  | Số bản ghi/trang (mặc định 10)             |
+| `keyword`   | Tìm kiếm chung (ô search)                  |
+| `orderBy`   | Cột sort                                   |
+| `orderDir`  | `ASC` / `DESC`                             |
+| `filter`    | Object filter theo từng cột                |
+
+Ví dụ request:
+
+```json
+{
+  "page": 1,
+  "pageSize": 10,
+  "keyword": "thông báo",
+  "orderBy": "createdAt",
+  "orderDir": "DESC",
+  "filter": {
+    "status": ["ACTIVE"],
+    "orgUnitId": ["uuid-1", "uuid-2"],
+    "createdAt": { "from": "2025-01-01", "to": "2025-12-31" }
+  }
+}
+```
+
+Key trong `filter` phải khớp `columnName` trong `filterColumns` (hoặc `filterKey` nếu dùng chunked custom).
+
+---
+
+## 3. Cấu hình `findManyOptions`
+
+Khai báo **một lần** ở đầu repository:
+
+```typescript
+const findManyOptions: GetListQueryHelperOptions<MyEntity> = {
+  // Tìm kiếm keyword
+  filterKeywordType: 'contains',              // 'contains' | 'equals'
+  filterKeywordColumns: ['keyword', 'name', 'code'],
+  keywordTransform: 'lower',                  // optional
+  originalSearch: true,                       // optional: search cột gốc, không qua keyword
+
+  // Filter từng cột
+  filterColumns: [
+    { columnName: 'status', type: 'int' },
+    { columnName: 'type', type: 'string' },
+    { columnName: 'orgUnitId', type: 'string' },
+    { columnName: 'code', type: 'string', compareType: 'like' },
+    { columnName: 'createdAt', type: 'date-time' },
+    { columnName: 'updatedAt', type: 'date-time' },
+    { columnName: 'isActive', type: 'boolean' },
+  ],
+}
+```
+
+### Kiểu `filterColumns`
+
+| `type`        | `compareType` | Hành vi                          |
+| ------------- | ------------- | -------------------------------- |
+| `string`      | (mặc định)    | IN exact match                   |
+| `string`      | `like`        | LIKE (thường dùng cho mã, tên)   |
+| `int`         | —             | IN số nguyên                     |
+| `date-time`   | —             | Range `{ from, to }`             |
+| `boolean`     | —             | true/false                       |
+
+---
+
+## 4. Chọn hàm apply
+
+| Hàm                       | Dùng khi                                                                 |
+| ------------------------- | ------------------------------------------------------------------------ |
+| `applyListQueryFilters`   | Cột filter ít giá trị (status, type, date)                               |
+| `applyListFiltersChunked` | Cột có thể IN nhiều UUID (orgUnitId, userId, caseAdvancedId) — Oracle    |
+
+---
+
+## 5. Pattern cơ bản — `applyListQueryFilters`
+
+```typescript
+async findAllAndCount(query: GetListQueryBaseDto) {
+  const queryBuilder = this.db.myEntity.createQueryBuilder('myEntity')
+
+  queryBuilder.leftJoinAndSelect('myEntity.createdBy', 'createdBy')
+
+  applyListQueryFilters({
+    queryBuilder,
+    options: findManyOptions,
+    query,
+    alias: 'myEntity',
+    defaultFilter: { status: [ModelStatus.ACTIVE] }, // optional
+  })
+
+  const items = await queryBuilder.getMany()
+  const total = await queryBuilder.getCount()
+
+  return {
+    items,
+    total,
+    totalPages: Math.ceil(total / (query.pageSize || 10)),
+  }
+}
+```
+
+Tham khảo: `data-access-permission.repository.ts`, `user-notification.repository.ts`.
+
+---
+
+## 6. Pattern chunked — `applyListFiltersChunked`
+
+Dùng khi `filter` có thể gửi **hàng trăm/nghìn ID** (multi-select đơn vị, user, vụ việc).
+
+```typescript
+const findManyOptions: GetListQueryHelperOptions<Notification> = {
+  filterKeywordType: 'contains',
+  filterKeywordColumns: ['content', 'notificationNumber', 'authorityAgency'],
+  filterColumns: [
+    { columnName: 'type', type: 'string' },
+    { columnName: 'caseAdvancedId', type: 'string' },
+    { columnName: 'createdById', type: 'string' },
+    { columnName: 'parentAgencyId', type: 'string' },
+    { columnName: 'implementingAgencyId', type: 'string' },
+    { columnName: 'status', type: 'string' },
+    { columnName: 'createdAt', type: 'date-time' },
+  ],
+}
+
+async findAllAndCount(query: GetListQueryBaseDto) {
+  const queryBuilder = this.db.notification.createQueryBuilder('notification')
+
+  applyListFiltersChunked(
+    queryBuilder,
+    findManyOptions,
+    query,
+    'notification',
+    ['caseAdvancedId', 'createdById', 'parentAgencyId', 'implementingAgencyId']
+  )
+
+  const [items, total] = await queryBuilder.getManyAndCount()
+
+  return {
+    items,
+    total,
+    totalPages: Math.ceil(total / (query.pageSize || 10)),
+  }
+}
+```
+
+Tham khảo: `notification.repository.ts`, `appraisal-team.repository.ts`.
+
+**Lưu ý:** Cột khai báo trong mảng chunked **bị loại** khỏi `filterColumns` tự động, rồi xử lý IN theo chunk (mặc định 998 phần tử/chunk).
+
+### Chunked column nâng cao
+
+```typescript
+applyListFiltersChunked(qb, findManyOptions, query, 'alias', [
+  'orgUnitId', // shorthand: filterKey = columnName, dbColumn = alias.orgUnitId
+  {
+    columnName: 'orgUnitId',
+    filterKey: 'orgUnitIds',           // key khác trong query.filter
+    dbColumn: 'alias.orgUnitId',       // cột SQL tùy chỉnh
+  },
+])
+```
+
+---
+
+## 7. Filter tùy chỉnh (ngoài `findManyOptions`)
+
+Xử lý **trước** khi gọi `applyListQueryFilters` / `applyListFiltersChunked`, rồi **xóa** key khỏi `query.filter` để tránh apply trùng:
+
+```typescript
+async findAllAndCount(query: GetListQueryBaseAllDto) {
+  const qb = this.db.appraisalTeam.createQueryBuilder('appraisalTeam')
+
+  const name = query.filter?.['name']
+  if (name) {
+    qb.andWhere('LOWER(appraisalTeam.name) LIKE LOWER(:teamName)', { teamName: `%${name}%` })
+    delete query.filter['name']
+  }
+
+  const startDate = query.filter?.['startDate']
+  if (startDate && typeof startDate === 'object') {
+    if (startDate.from) qb.andWhere('appraisalTeam.startDate >= :from', { from: startDate.from })
+    if (startDate.to) qb.andWhere('appraisalTeam.startDate <= :to', { to: startDate.to })
+    delete query.filter['startDate']
+  }
+
+  applyListFiltersChunked(qb, findManyOptions, query, 'appraisalTeam', ['orgUnitId'])
+
+  const [items, total] = await qb.getManyAndCount()
+  return { items, total, totalPages: Math.ceil(total / (query.pageSize || 10)) }
+}
+```
+
+Dùng khi: search case-insensitive, subquery, join bảng con, logic date đặc biệt.
+
+---
+
+## 8. Quy tắc nhanh
+
+1. `columnName` trong `filterColumns` = key client gửi trong `query.filter`.
+2. Cột UUID multi-select → khai báo trong `applyListFiltersChunked` (param thứ 5).
+3. `defaultFilter` chỉ áp khi client không gửi filter cho cột đó.
+4. `alias` trong apply phải khớp alias `createQueryBuilder('alias')`.
+5. Join relation **trước** khi apply filter.
+6. `findAll` (không page) dùng `GetListQueryBaseAllDto`, cùng pattern apply filter.
+7. Filter phức tạp: custom `andWhere` → `delete query.filter[key]` → apply helper.

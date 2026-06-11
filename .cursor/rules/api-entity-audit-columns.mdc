@@ -1,0 +1,35 @@
+---
+description: Mọi TypeORM entity phải có 2 cột audit — ngay_tao và ngay_cap_nhat
+globs: packages/api-models/src/entity/**/*.ts
+alwaysApply: false
+---
+
+# Audit columns — bắt buộc trong mọi entity
+
+Mọi TypeORM entity **bắt buộc** có đủ 2 cột audit ở cuối class:
+
+```ts
+// ✅ Đúng
+@CreateDateColumn({ name: 'ngay_tao', type: 'timestamptz' })
+ngay_tao: Date;
+
+@UpdateDateColumn({ name: 'ngay_cap_nhat', type: 'timestamptz' })
+ngay_cap_nhat: Date;
+```
+
+- Dùng `timestamptz` (có timezone), không dùng `timestamp`
+- Tên cột snake_case: `ngay_tao`, `ngay_cap_nhat`
+- Đặt **cuối cùng** trong class, sau tất cả các field nghiệp vụ
+- Không tự assign giá trị — để TypeORM tự quản lý qua decorator
+
+```ts
+// ❌ Sai — tự assign trong service/repository
+entity.ngay_tao = new Date();
+
+// ❌ Sai — dùng timestamp thiếu timezone
+@CreateDateColumn({ type: 'timestamp' })
+
+// ❌ Sai — camelCase
+@CreateDateColumn()
+createdAt: Date;
+```

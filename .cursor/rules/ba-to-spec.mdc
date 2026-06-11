@@ -1,0 +1,346 @@
+---
+globs: prompts/**/*.md
+alwaysApply: false
+---
+
+# Phân tích tài liệu BA → sinh file spec
+
+Khi nhận tài liệu BA (dạng mô tả chức năng ngắn), hãy phân tích và sinh file spec đầy đủ
+theo cấu trúc `prompts/ba-template.md`. Output lưu tại `prompts/[ten-chuc-nang].md`.
+
+---
+
+## Quy trình 5 bước
+
+1. **Đọc BA doc** — xác định: module tên gì, actor nào, chức năng nào, màn hình nào, business rules nào
+2. **Xác định scope** — full CRUD / read-only / backend-only / frontend-only
+3. **Map fields** — từ tên cột UI → field name trong entity (snake_case)
+4. **Suy luận phần thiếu** — BA doc thường thiếu API endpoint, DTO, enum; hãy suy luận từ context
+5. **Viết theo thứ tự template** — không bỏ section, không đảo thứ tự; section không áp dụng thì ghi `_Không áp dụng_`
+
+---
+
+## Mapping: BA doc → từng section của template
+
+### 1. Metadata block (header blockquote)
+
+**Nguồn từ BA doc:**
+
+- `Module:` → tên module, suy ra `[route]` dạng kebab-case
+- `Entity:` → đường dẫn entity file
+- `Hệ thống:` → xác định data source
+
+**Quy tắc:**
+
+- Route API: `apps/api/src/[module-slug]/`
+- Route Web: `apps/web/app/(admin)/[route-slug]/`
+- Bỏ dòng Route API nếu frontend-only, bỏ Route Web nếu backend-only
+
+---
+
+### 2. Mục tiêu
+
+**Nguồn từ BA doc:** tên module + actors + danh sách chức năng
+
+**Viết:** 2–3 câu, trả lời: module làm gì / ai dùng / điểm đặc biệt (vd: scope theo actor)
+
+---
+
+### 2b. Skill Sử dụng & Mode sử dụng
+
+**Nguồn từ BA doc:** mục "Skill Sử dụng" và "dev agent Mode sử dụng"
+
+**Quy tắc spec (Skill):**
+
+- Chỉ liệt kê **skill path** theo Layer (`Backend` → `.cursor/skills/back-end`, `Frontend` → `.cursor/skills/font-end`)
+- **KHÔNG** liệt kê rule file trong spec — rules tự load qua `workflows/load-rules.md` của skill khi task chạy
+- Ngoại lệ stack (e-ticket, v.v.) đặt trong skill `overrides/`, không trong spec
+
+**Quy tắc thực thi (agent):**
+
+- Task Layer = **Backend** → đọc `.cursor/skills/back-end/SKILL.md` + `workflows/load-rules.md` → load rule theo file trong task
+- Task Layer = **Frontend** → đọc `.cursor/skills/font-end/SKILL.md` + `workflows/load-rules.md`
+- Subagent prompt: ghi Layer + skill path; **không** paste bảng rule
+
+**Mode sử dụng:**
+
+- Giữ nguyên giá trị từ BA doc sang spec — **trừ** `GPT 5.5`: không ghi vào spec; thay bằng `Sonnet 4.6`
+- Nếu BA doc không có → dùng default trong template (`caveman` + `Sonnet 4.6`)
+- **Ngoại lệ — task tạo Entity:** luôn dùng `Composer 2.5`, **không** kế thừa Mode chung (xem mục **12. Phân rã task**)
+
+---
+
+### 3. Actors & Phân quyền
+
+**Nguồn từ BA doc:** bảng Actors
+
+**Quy tắc sinh permission constants:**
+
+- Tên constant = `VERB_MODULE` hoặc `MODULE_VERB`
+- Xem → `VIEW_[MODULE]`
+- Tạo → `[MODULE]_CREATE`
+- Sửa → `UPDATE_[MODULE]`
+- Xoá → `DELETE_[MODULE]`
+- Hành động nghiệp vụ (duyệt, từ chối…) → `[MODULE]_[ACTION]`
+- Actor có scope giới hạn (chủ tàu, đại lý…) → thêm permission riêng `[ROLE]_[MODULE]`
+
+---
+
+### 4. Màn hình danh sách
+
+**Nguồn từ BA doc:** mục "Màn hình danh sách" → Cột bảng + Bộ lọc
+
+**Cột bảng:**
+
+- Map tên cột UI → field API snake_case
+- Luôn có cột: STT / Trạng thái / Người tạo / Ngày tạo / Thao tác
+- Ghi chú: format date (`dd/MM/yyyy HH:mm`), badge, link, VNĐ
+
+**Bộ lọc (chỉ UI — BA doc):**
+
+- Keyword → thường map `ma_[entity]`, `nguoi_tao`
+- Trạng thái → multi-select từ enum chính
+- Các dropdown → tìm FK trong BA doc (tàu, hành trình…)
+- Date range → `tu_ngay` / `den_ngay` map vào field ngày chính
+- **KHÔNG** ghi `applyListQueryFilters`, SQL, `compare`, config file vào BA doc — phần kỹ thuật do bước 4b tự sinh vào spec
+
+**Bộ lọc & tìm kiếm (spec — UI):** giữ nguyên mô tả từ BA doc (bullet hoặc bảng UI), thêm field API snake_case.
+
+---
+
+### 4b. Repository filter — tự sinh từ Bộ lọc BA (bắt buộc khi có màn danh sách + filter)
+
+Khi BA doc có **Xem danh sách** + **Bộ lọc**, spec **phải** sinh section kỹ thuật filter theo mẫu chung — **không** chờ BA doc ghi sẵn.
+
+**Vị trí trong spec:** sau `### Filter phân trang ([Module]ListQueryDto)` trong `## API Backend`, thêm `### Repository filter (applyListQueryFilters)`.
+
+**Mẫu cố định — một hàm duy nhất:**
+
+- Hàm: `applyListQueryFilters` từ `@ac/api-common` — `config` khai báo trong repository theo bảng spec
+- **Không** tạo file `*-list-filter.config.ts`, **không** export `*_LIST_FILTER_CONFIG`
+- **Không** tạo wrapper filter, **không** `private applyListQueryFilters`, **không** `andWhere` thủ công cho cột preset
+
+**Map BA filter → DTO + compare (suy luận tự động):**
+
+| BA doc mô tả               | Field DTO              | `compare`                 | Ghi chú `dbColumn`                       |
+| -------------------------- | ---------------------- | ------------------------- | ---------------------------------------- |
+| Keyword (field A, B, …)    | `keyword`              | _(keyword config)_        | `alias.field_a`, `alias.field_b` — ILIKE |
+| Trạng thái multi-select    | `trang_thai`           | `in`                      | `alias.trang_thai`                       |
+| Dropdown FK / UUID         | `[ten]_id`             | `eq`                      | `alias.[ten]_id`                         |
+| Dropdown mã / danh sách mã | `[field]`              | `in` hoặc `array-overlap` | PostgreSQL array → `array-overlap`       |
+| Khoảng ngày (ngày X)       | `tu_ngay` / `den_ngay` | `gte` / `lte`             | `alias.[field_ngay]`                     |
+
+**Suy luận từ Business rules → `options` khi gọi hàm:**
+
+| Business rule BA               | Option `applyListQueryFilters`                                         |
+| ------------------------------ | ---------------------------------------------------------------------- |
+| Actor scope (chủ tàu, đại lý…) | `actorScope: { paramKey, dbColumn }` — service set param từ session    |
+| Soft delete / loại đã xoá      | `excludeDeleted: { column, value }`                                    |
+| Thống kê theo filter hiện tại  | Endpoint `/thong-ke` dùng **cùng** config + options (không phân trang) |
+
+**Bảng bắt buộc trong spec** (`### Repository filter`):
+
+| Bộ lọc UI | Field DTO    | `compare`    | `dbColumn`    |
+| --------- | ------------ | ------------ | ------------- |
+| _(từ BA)_ | _(suy luận)_ | _(suy luận)_ | `alias.field` |
+
+**Phân rã task T1 (repository):** ghi rõ gọi `applyListQueryFilters(qb, params, options?)`; rule tự load qua skill `back-end` — **không** paste rule vào spec.
+
+**Tiêu chí hoàn thành Backend:** giữ checklist `Pagination + filter qua [Name]ListQueryDto + applyListQueryFilters`.
+
+---
+
+### 5. Chi tiết [tên]
+
+**Nguồn từ BA doc:** mục "Màn hình chi tiết" → danh sách nhóm thông tin
+
+**Quy tắc:**
+
+- Mỗi nhóm trong BA doc = 1 sub-section với bảng `Trường | Field`
+- Chia nhóm ngữ nghĩa: Thông tin chung / [Đối tượng liên quan] / Tài chính / …
+- Kết thúc bằng bảng Relations nếu có FK/join
+
+---
+
+### 6. Form tạo / sửa
+
+**Nguồn từ BA doc:** danh sách chức năng có "Tạo mới" hoặc "Sửa"
+
+**Quy tắc:**
+
+- Bỏ section này nếu chỉ read-only
+- Field bắt buộc (✅) = field không thể null theo business rule
+- Ghi chú default value nếu BA doc đề cập (vd: trạng thái mặc định `ban_nhap`)
+
+---
+
+### 7. API Backend
+
+**Nguồn từ BA doc:** danh sách chức năng → suy ra endpoints
+
+**Quy tắc sinh endpoints:**
+
+- Xem danh sách → `GET /[module]/phan-trang`
+- Xem chi tiết → `GET /[module]/:id`
+- Tạo mới → `POST /[module]`
+- Sửa → `PATCH /[module]/:id`
+- Xoá → `DELETE /[module]/:id`
+- Hành động nghiệp vụ (duyệt…) → `PATCH /[module]/:id/[hanh-dong]`
+
+Filter DTO: map từ bộ lọc màn hình danh sách → field + kiểu dữ liệu (bảng `### Filter phân trang`).
+
+Repository filter: sinh theo **4b** — bảng `compare` + `dbColumn` + config file + options scope/soft-delete.
+
+---
+
+### 8. Model & Enum
+
+**Nguồn từ BA doc:** Entity path + Business rules + tên cột bảng
+
+**Quy tắc:**
+
+- Chia field thành nhóm: Định danh / [Nghiệp vụ] / Trạng thái & nguồn / Tài chính
+- Audit columns (`ngay_tao`, `ngay_cap_nhat`) **KHÔNG liệt kê** — đã có rule riêng tự thêm
+- Enum: liệt kê tất cả values + nhóm UI cho badge màu
+- Suy luận enum từ danh sách trạng thái trong BA doc
+
+---
+
+### 9. DTO & Validation
+
+**Nguồn từ BA doc:** fields form tạo/sửa + business rules
+
+**Quy tắc:**
+
+- `Create[Name]Dto` — field bắt buộc từ Form tạo
+- `Update[Name]Dto` — `PartialType(Create[Name]Dto)`
+- `Search[Name]Dto` — filter từ Bộ lọc màn hình danh sách
+- Ghi chú DTO ↔ Entity khi tên field khác nhau (vd: `loai_dat_cho` DTO → `nguon_dat_cho` entity)
+
+---
+
+### 10. Cấu trúc file
+
+Sinh tree view theo đúng convention (đã định nghĩa trong rule `api-module-structure` và `web-module-structure`).
+Không tự thêm file ngoài convention.
+
+---
+
+### 11. Tiêu chí hoàn thành
+
+**Quy tắc:**
+
+- Backend checklist: luôn có 7 mục chuẩn (controller thin, pagination, selective joins, batch load, DTO, Swagger, NotFoundException)
+- Frontend checklist: bỏ mục "Form tạo/sửa" nếu read-only
+
+---
+
+### 12. Phân rã task
+
+**Nguồn từ BA doc:** danh sách chức năng + scope layer → chia task theo convention `prompt-structure.mdc`
+
+**Bảng task bắt buộc có cột `Model`:**
+
+| #  | Task              | Layer   | Phụ thuộc | File chính | Model        |
+| -- | ----------------- | ------- | --------- | ---------- | ------------ |
+| T1 | Tạo Entity + Enum | Backend | —         | `entity/…` | Composer 2.5 |
+| T2 | …                 | …       | …         | …          | _(theo Mode)_ |
+
+**Quy tắc cột `Model`:**
+
+- Task **tạo Entity** (file trong `packages/api-models/src/entity/`, thường T1 "Tạo Entity + Enum") → ghi **`Composer 2.5`** — bắt buộc, không dùng model từ `## Mode sử dụng`
+- Task khác → `_theo Mode sử dụng_` hoặc để trống (agent map từ mục `## Mode sử dụng` khi chạy)
+
+**Subsection task Entity** (vd. `### T1 — Tạo Entity + Enum`) phải có dòng:
+
+- **Model:** `Composer 2.5` (`composer-2.5-fast`)
+
+---
+
+## Ví dụ mapping nhanh
+
+| BA doc nói                                    | Template section              | Sinh ra                                                            |
+| --------------------------------------------- | ----------------------------- | ------------------------------------------------------------------ |
+| `Actor: Chủ tàu — chỉ xem tàu mình`           | Actors & Phân quyền           | `SHIP_OWNER_BOOKING` permission                                    |
+| `Cột: Tổng tiền — format VNĐ`                 | Màn hình danh sách / Cột bảng | `th_tong_tien` \| Format tiền VNĐ                                  |
+| `Bộ lọc: Tàu thuyền (dropdown)`               | Bộ lọc & tìm kiếm             | `tau_thuyen_id` UUID dropdown                                      |
+| `Bộ lọc` (bất kỳ, BA doc không có SQL)        | Repository filter (4b)        | Bảng `compare` + `applyListQueryFilters` (không file config riêng) |
+| `Business rule: trang thái mặc định ban_nhap` | Form + DTO + Model            | Default `ban_nhap`, note trong Form                                |
+| `Chức năng: Duyệt`                            | API Backend                   | `PATCH /[module]/:id/duyet`                                        |
+| Task T1 tạo Entity + Enum                       | Phân rã task                  | Cột `Model` = `Composer 2.5`; slug `composer-2.5-fast` khi chạy |
+
+---
+
+## Quy tắc định dạng output
+
+- **BA doc giữ UI** — không copy `applyListQueryFilters`, SQL, `compare` ngược từ spec vào BA doc
+- **Bảng > prose** cho mọi danh sách field, endpoint, task
+- **Section cách nhau bằng `---`**
+- **Metadata trong blockquote** (`>`)
+- **Placeholder đã giải quyết hết** — output không còn `[tên]` nào chưa điền
+- **Lưu file** tại `prompts/[ten-module].md` (kebab-case)
+
+---
+
+## Quy tắc thực thi từ spec
+
+Khi user yêu cầu **implement/code** từ file spec (`prompts/*.md`), **bắt buộc** đọc 2 field sau trước khi bắt đầu:
+
+### 1. Mode sử dụng → chọn model cho subagent
+
+Đọc mục `## Mode sử dụng` trong spec. Map tên model → slug:
+
+| Tên trong spec | Model slug                          |
+| -------------- | ----------------------------------- |
+| Composer 2.5   | `composer-2.5-fast`                 |
+| Sonnet 4.6     | `claude-4.6-sonnet-medium-thinking` |
+| Opus 4.6       | `claude-4.6-opus-high-thinking`     |
+| Opus 4.5       | `claude-4.5-opus-high-thinking`     |
+
+**Cấm:** **không** dùng slug `gpt-5.5-medium`. Nếu spec/BA doc ghi `GPT 5.5` → fallback `Sonnet 4.6` (`claude-4.6-sonnet-medium-thinking`).
+
+**Override — task tạo Entity (bắt buộc):**
+
+- Nhận diện: cột `Model` = `Composer 2.5`, hoặc file chính thuộc `packages/api-models/src/entity/`, hoặc tên/mô tả task chứa "Entity" (+ Enum)
+- Luôn gọi **Task tool** với `model` = **`composer-2.5-fast`** — **override** model từ `## Mode sử dụng`
+- Chỉ áp dụng cho task tạo/sửa entity file; repository, DTO, controller… vẫn theo Mode chung
+
+**Hành vi bắt buộc:**
+
+- Mỗi task trong `## Phân rã task` → gọi **Task tool** với `model` = slug tương ứng (ưu tiên cột `Model` task, rồi override Entity, rồi `## Mode sử dụng`) và `run_in_background: true`
+- Các task không phụ thuộc nhau → chạy **song song** (gửi nhiều Task call trong 1 message)
+- Các task có phụ thuộc → chạy **tuần tự** (chờ task trước xong mới gửi task sau)
+- **KHÔNG** chạy trực tiếp trong cửa sổ hiện tại nếu spec có field Mode sử dụng
+- Nếu spec không có field Mode sử dụng → chạy trực tiếp (hành vi mặc định)
+
+**Prompt cho subagent phải bao gồm:**
+
+- Nội dung task cụ thể từ spec (file cần tạo, fields, business rules)
+- **Layer** (Backend | Frontend) và skill path tương ứng
+- Lệnh: đọc skill `workflows/load-rules.md` trước khi code
+- Đường dẫn file đầy đủ
+- Pattern tham khảo (entity/repo/controller bookings hiện có)
+- Yêu cầu trả về danh sách file đã tạo/sửa khi hoàn thành
+
+### 2. Skill Sử dụng → kích hoạt skill + auto-load rules
+
+Đọc mục `## Skill Sử dụng` trong spec:
+
+- Map **Layer** của task → skill (`back-end` | `font-end`)
+- Đọc `SKILL.md` + `workflows/load-rules.md` **khi bắt đầu task** (không load hết rules lúc đọc spec)
+- Skill khác (vd: `caveman`) → áp dụng cho communication style, không thay coding rules
+- Truyền Layer + skill path vào subagent; subagent tự resolve rule theo file
+
+### Ví dụ flow thực thi
+
+```
+1. User: "Implement từ prompts/chuc-nang-tau-thuyen.md"
+2. AI đọc spec → thấy Mode = Sonnet 4.6, Skill = caveman
+3. AI đọc skill caveman → kích hoạt
+4. AI gửi T1 (Entity + Enum) → Task tool, model=composer-2.5-fast  ← bắt buộc, không dùng Sonnet
+5. T1 xong → gửi T2 + T3 song song (cả hai depend T1), model=claude-4.6-sonnet-medium-thinking
+6. T2 + T3 xong → gửi T4 + T5 song song
+7. T4 xong → gửi T6 + T7 song song
+8. T5 xong → gửi T8
+9. Tổng hợp kết quả, báo cáo dạng caveman
+```

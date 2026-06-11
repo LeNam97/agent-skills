@@ -1,0 +1,86 @@
+---
+description: Quy tắc kỹ thuật bắt buộc cho NestJS — joins, N+1, Swagger, NotFoundException, snake_case
+globs: apps/api/**/*.ts,packages/api-models/**/*.ts
+alwaysApply: false
+---
+
+# Quy tắc kỹ thuật NestJS
+
+## Selective joins — không over-fetch
+
+Chỉ join relation khi thực sự cần dữ liệu đó. Không `leftJoinAndSelect` toàn bộ.
+
+```ts
+// ✅ Đúng — chỉ join field cần thiết
+qb.leftJoin('booking.tau_thuyen', 'tau')
+  .addSelect(['tau.id', 'tau.ten_tau', 'tau.ma_tau']);
+
+// ❌ Sai — load toàn bộ relation
+qb.leftJoinAndSelect('booking.tau_thuyen', 'tau');
+```
+
+## Batch load — không loop N+1
+
+Khi cần load sub-records theo danh sách ID, dùng `IN` query một lần, không gọi trong loop.
+
+```ts
+// ✅ Đúng — 1 query cho toàn bộ
+const passengers = await this.repo.findBy({ booking_id: In(bookingIds) });
+
+// ❌ Sai — N query trong loop
+for (const booking of bookings) {
+  booking.passengers = await this.repo.findBy({ booking_id: booking.id });
+}
+```
+
+## Swagger — bắt buộc trên mọi endpoint
+
+Mọi method trong controller phải có `@ApiOperation` và `@ApiResponse`.
+
+```ts
+// ✅ Đúng
+@ApiOperation({ summary: 'Lấy danh sách booking phân trang' })
+@ApiResponse({ status: 200, description: 'Thành công', type: BookingPaginatedDto })
+@ApiResponse({ status: 403, description: 'Không có quyền' })
+@Get('phan-trang')
+async getList(@Query() query: BookingListQueryDto) { ... }
+
+// ❌ Sai — thiếu Swagger decorator
+@Get('phan-trang')
+async getList(@Query() query: BookingListQueryDto) { ... }
+```
+
+## NotFoundException — resource không tồn tại
+
+Dùng `NotFoundException` khi không tìm thấy record theo ID, không trả `null` hay `undefined`.
+
+```ts
+// ✅ Đúng
+const entity = await this.repo.findOneBy({ id });
+if (!entity) throw new NotFoundException(`Không tìm thấy booking #${id}`);
+return entity;
+
+// ❌ Sai — trả null, để controller hoặc frontend tự xử lý
+return await this.repo.findOneBy({ id });
+```
+
+## Naming — snake_case cho field DB/API
+
+Field trong entity, DTO, query param và response **luôn dùng snake_case** theo domain.
+
+```ts
+// ✅ Đúng
+@Column({ name: 'ma_dat_cho' })
+ma_dat_cho: string;
+
+class BookingListQueryDto {
+  tau_thuyen_id?: string;
+  tu_ngay?: Date;
+}
+
+// ❌ Sai — camelCase cho DB/API field
+@Column({ name: 'maDatCho' })
+maDatCho: string;
+```
+
+> Ngoại lệ: tên class, decorator, biến nội bộ TypeScript vẫn dùng camelCase theo quy ước TS.

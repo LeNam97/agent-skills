@@ -1,0 +1,14 @@
+{
+  "version": "1.0.0",
+  "organization": "App City CMS Team",
+  "date": "June 2026",
+  "abstract": "Back-end conventions for App City CMS monorepo: NestJS feature modules with AcRequest user context and NextAuthMiddleware, TypeORM custom repositories with applyListQueryFilters, entity registration in three places, Vietnamese DTO validation. Derived from .cursorrules.",
+  "references": [
+    "apps/api/",
+    "apps/workflow/",
+    "packages/models/",
+    "packages/common/",
+    "packages/be/",
+    ".cursorrules"
+  ]
+}
